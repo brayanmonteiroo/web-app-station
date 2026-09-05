@@ -4,8 +4,8 @@
 # Uso típico (com scripts do l10n.kde.org no PATH):
 #   $EXTRACTRC ... ; $XGETTEXT ...
 #
-# Sem o toolkit KDE completo, mantenha po/en/webappstation.po sincronizado
-# manualmente ao adicionar i18n("...") novos.
+# Sem o toolkit KDE completo, mantenha po/en_GB/webappstation.po sincronizado
+# manualmente ao adicionar i18n("...") novos. (Não use po/en — KI18n ignora.)
 
 # shellcheck disable=SC2086
 $XGETTEXT `find src -name '*.cpp' -o -name '*.h' -o -name '*.qml'` -o "$podir"/webappstation.pot 2>/dev/null || true

@@ -282,21 +282,21 @@ if [[ "$TOOL_RC" -eq 127 ]]; then
 fi
 echo "==> appimageupdatetool OK (smoke exit=$TOOL_RC)"
 
-# Catálogo i18n (en) precisa ir no AppImage para o seletor de idioma.
-if [[ ! -f "$APPDIR/usr/share/locale/en/LC_MESSAGES/webappstation.mo" ]]; then
-  echo "==> Copiando locale/en do build para o AppDir..."
+# Catálogo i18n (en_GB) — KI18n ignora po/en (trata como idioma-fonte).
+if [[ ! -f "$APPDIR/usr/share/locale/en_GB/LC_MESSAGES/webappstation.mo" ]]; then
+  echo "==> Copiando locale/en_GB do build para o AppDir..."
   mkdir -p "$APPDIR/usr/share/locale"
-  if [[ -d "$ROOT/build/locale/en" ]]; then
-    cp -a "$ROOT/build/locale/en" "$APPDIR/usr/share/locale/"
-  elif [[ -d "$ROOT/build-agent/locale/en" ]]; then
-    cp -a "$ROOT/build-agent/locale/en" "$APPDIR/usr/share/locale/"
+  if [[ -d "$ROOT/build/locale/en_GB" ]]; then
+    cp -a "$ROOT/build/locale/en_GB" "$APPDIR/usr/share/locale/"
+  elif [[ -d "$ROOT/build-agent/locale/en_GB" ]]; then
+    cp -a "$ROOT/build-agent/locale/en_GB" "$APPDIR/usr/share/locale/"
   else
-    echo "Erro: webappstation.mo (en) não encontrado para o AppImage." >&2
+    echo "Erro: webappstation.mo (en_GB) não encontrado para o AppImage." >&2
     exit 1
   fi
 fi
-if [[ ! -f "$APPDIR/usr/share/locale/en/LC_MESSAGES/webappstation.mo" ]]; then
-  echo "Erro: falha ao empacotar traduções em inglês." >&2
+if [[ ! -f "$APPDIR/usr/share/locale/en_GB/LC_MESSAGES/webappstation.mo" ]]; then
+  echo "Erro: falha ao empacotar traduções em inglês (en_GB)." >&2
   exit 1
 fi
 

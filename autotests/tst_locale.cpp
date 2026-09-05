@@ -22,8 +22,8 @@ private Q_SLOTS:
             + QStringLiteral("/../locale"));
         QVERIFY2(QFile::exists(localeRoot
                                + QStringLiteral(
-                                   "/en/LC_MESSAGES/webappstation.mo")),
-                 qPrintable(QStringLiteral("Missing en catalog at %1")
+                                   "/en_GB/LC_MESSAGES/webappstation.mo")),
+                 qPrintable(QStringLiteral("Missing en_GB catalog at %1")
                                 .arg(localeRoot)));
         qputenv("WEBAPPSTATION_LOCALE_DIR", QFile::encodeName(localeRoot));
 
@@ -33,7 +33,6 @@ private Q_SLOTS:
 
     void english_translates_core_ui_strings()
     {
-        // Preferência como o app real: env + setLanguages via finishI18nSetup.
         LocaleService locale;
         locale.setLanguage(QStringLiteral("en"));
         LocaleService::finishI18nSetup();

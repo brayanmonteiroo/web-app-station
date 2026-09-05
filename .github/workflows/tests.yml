@@ -20,6 +20,7 @@ jobs:
         run: |
           dnf install -y \
             git cmake ninja-build gcc-c++ extra-cmake-modules gettext \
+            glibc-langpack-en \
             qt6-qtbase-devel qt6-qtdeclarative-devel \
             kf6-kirigami-devel kf6-ki18n-devel kf6-kcoreaddons-devel \
             kf6-kconfig-devel kf6-kiconthemes-devel kf6-qqc2-desktop-style \
@@ -38,3 +39,5 @@ jobs:
         run: ctest --test-dir build --output-on-failure
         env:
           QT_QPA_PLATFORM: offscreen
+          LANG: en_GB.UTF-8
+          LANGUAGE: en_GB

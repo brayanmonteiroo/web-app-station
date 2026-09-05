@@ -11,6 +11,8 @@
 #include <QStandardPaths>
 #include <QTextStream>
 
+#include <clocale>
+
 namespace {
 
 QString normalizeCode(const QString &raw)
@@ -21,7 +23,8 @@ QString normalizeCode(const QString &raw)
         return QStringLiteral("pt_BR");
     }
     if (code == QStringLiteral("en") || code == QStringLiteral("en_US")
-        || code == QStringLiteral("en-US")) {
+        || code == QStringLiteral("en-US") || code == QStringLiteral("en_GB")
+        || code == QStringLiteral("en-GB")) {
         return QStringLiteral("en");
     }
     if (code == QStringLiteral("system") || code.isEmpty()) {
@@ -98,14 +101,16 @@ void LocaleService::applyLanguageEnv(const QString &code)
     if (normalized == QStringLiteral("pt_BR")) {
         qputenv("LANGUAGE", "pt_BR");
         qputenv("LANG", "pt_BR.UTF-8");
+    } else if (normalized == QStringLiteral("en")) {
+        // KI18n trata en/en_US como idioma-fonte (devolve msgid).
+        // Catálogo real: po/en_GB → locale/en_GB/.
+        qputenv("LANGUAGE", "en_GB");
+        qputenv("LANG", "en_GB.UTF-8");
+    } else {
         return;
     }
-    if (normalized == QStringLiteral("en")) {
-        // Catálogo KI18n está em po/en → pasta locale/en/
-        qputenv("LANGUAGE", "en");
-        qputenv("LANG", "en_US.UTF-8");
-        return;
-    }
+    // Com LANG=C.UTF-8 (containers CI), só qputenv não basta para o gettext.
+    setlocale(LC_ALL, "");
 }
 
 void LocaleService::registerLocaleDirs()
@@ -130,7 +135,7 @@ void LocaleService::registerLocaleDirs()
         if (!QDir(clean).exists()) {
             continue;
         }
-        if (!hasCatalog(clean, QStringLiteral("en"))) {
+        if (!hasCatalog(clean, QStringLiteral("en_GB"))) {
             continue;
         }
         KLocalizedString::addDomainLocaleDir(QByteArrayLiteral("webappstation"),
@@ -141,12 +146,10 @@ void LocaleService::registerLocaleDirs()
 void LocaleService::applyLanguageOverride(const QString &code)
 {
     const QString normalized = normalizeCode(code);
-    // Em KF6 mais antigos (ex.: Fedora 42 do CI), setLanguages sozinho
-    // não basta — gettext ainda lê LANGUAGE/LANG.
     applyLanguageEnv(normalized);
     if (normalized == QStringLiteral("en")) {
-        KLocalizedString::setLanguages(
-            {QStringLiteral("en"), QStringLiteral("en_US")});
+        // Nunca usar "en"/"en_US" aqui — KI18n ignora o .mo e devolve msgid.
+        KLocalizedString::setLanguages({QStringLiteral("en_GB")});
         return;
     }
     if (normalized == QStringLiteral("pt_BR")) {

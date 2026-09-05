@@ -104,7 +104,7 @@ AppController::AppController(QObject *parent)
 QVariantList AppController::categories() const
 {
     // IDs = Main Categories do freedesktop (evita "Achados e perdidos" no KDE).
-    // Textos-fonte em pt_BR; inglês via po/en (KI18n).
+    // Textos-fonte em pt_BR; inglês via po/en_GB (KI18n ignora po/en).
     return {
         QVariantMap{{QStringLiteral("id"), QStringLiteral("Network")},
                     {QStringLiteral("name"), i18n("Internet")}},
