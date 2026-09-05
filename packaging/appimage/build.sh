@@ -78,6 +78,12 @@ extract_appimage "$LINUXDEPLOY" "$TOOLS_DIR/linuxdeploy"
 extract_appimage "$LINUXDEPLOY_QT" "$TOOLS_DIR/linuxdeploy-qt"
 extract_appimage "$APPIMAGETOOL" "$TOOLS_DIR/appimagetool"
 
+# strip embutido é binutils antigo (não lê .relr.dyn do Fedora/glibc moderno).
+# Preferir strip do sistema; se ausente, NO_STRIP desliga o passo.
+rm -f "$TOOLS_DIR/linuxdeploy/squashfs-root/usr/bin/strip" \
+      "$TOOLS_DIR/linuxdeploy-qt/squashfs-root/usr/bin/strip" || true
+export NO_STRIP="${NO_STRIP:-1}"
+
 LINUXDEPLOY_BIN="$TOOLS_DIR/linuxdeploy/squashfs-root/AppRun"
 # Plugin precisa estar no PATH com nome linuxdeploy-plugin-qt
 PLUGIN_DIR="$TOOLS_DIR/linuxdeploy-qt/squashfs-root"
@@ -87,11 +93,49 @@ fi
 export PATH="$TOOLS_DIR:$PATH"
 APPIMAGETOOL_BIN="$TOOLS_DIR/appimagetool/squashfs-root/AppRun"
 
-# Optional AppImageUpdate tool for in-app updates (ELF real).
+QMAKE_BIN="$(command -v qmake6 || command -v qmake-qt6 || command -v qmake || true)"
+if [[ -z "$QMAKE_BIN" ]]; then
+  echo "Erro: qmake6 não encontrado (necessário para linuxdeploy-plugin-qt)." >&2
+  exit 1
+fi
+export QMAKE="$QMAKE_BIN"
+export QML_SOURCES_PATHS="$ROOT/src/qml"
+export EXTRA_QT_PLUGINS="wayland;xcb;platforms;platformthemes;imageformats;iconengines;tls;networkinformation;generic"
+
+# Nomes de plugins variam entre distros/Qt (Fedora: libqwayland.so; alguns: *-generic/-egl).
+QT_PLATFORMS_DIR=""
+for d in /usr/lib64/qt6/plugins/platforms /usr/lib/qt6/plugins/platforms /usr/lib/x86_64-linux-gnu/qt6/plugins/platforms; do
+  if [[ -d "$d" ]]; then
+    QT_PLATFORMS_DIR="$d"
+    break
+  fi
+done
+PLATFORM_PLUGINS=()
+for plugin in libqxcb.so libqwayland.so libqwayland-generic.so libqwayland-egl.so; do
+  if [[ -n "$QT_PLATFORMS_DIR" && -f "$QT_PLATFORMS_DIR/$plugin" ]]; then
+    PLATFORM_PLUGINS+=("$plugin")
+  fi
+done
+if [[ ${#PLATFORM_PLUGINS[@]} -gt 0 ]]; then
+  export EXTRA_PLATFORM_PLUGINS
+  EXTRA_PLATFORM_PLUGINS="$(IFS=';'; echo "${PLATFORM_PLUGINS[*]}")"
+  echo "==> Platform plugins: $EXTRA_PLATFORM_PLUGINS"
+fi
+
+echo "==> Empacotando dependências Qt/KF com linuxdeploy (qmake=$QMAKE)..."
+"$LINUXDEPLOY_BIN" \
+  --appdir "$APPDIR" \
+  --executable "$APPDIR/usr/bin/${BINARY}" \
+  --desktop-file "$APPDIR/usr/share/applications/${APP_ID}.desktop" \
+  --icon-file "$APPDIR/usr/share/icons/hicolor/scalable/apps/${APP_ID}.svg" \
+  --plugin qt
+
+# appimageupdatetool DEPOIS do linuxdeploy — senão ele tenta resolver
+# libappimageupdate.so e aborta o deploy.
 UPDATE_TOOL_URL="https://github.com/AppImageCommunity/AppImageUpdate/releases/download/continuous/appimageupdatetool-x86_64.AppImage"
 UPDATE_TOOL_AI="$ROOT/appimageupdatetool-x86_64.AppImage"
 UPDATE_TOOL_DEST="$APPDIR/usr/bin/appimageupdatetool"
-mkdir -p "$APPDIR/usr/bin"
+mkdir -p "$APPDIR/usr/bin" "$APPDIR/usr/lib"
 if [[ ! -x "$UPDATE_TOOL_DEST" ]]; then
   echo "==> Baixando e extraindo appimageupdatetool..."
   download_tool "$UPDATE_TOOL_URL" "$UPDATE_TOOL_AI"
@@ -101,29 +145,17 @@ if [[ ! -x "$UPDATE_TOOL_DEST" ]]; then
   if [[ -n "$FOUND" && -f "$FOUND" ]]; then
     cp -f "$FOUND" "$UPDATE_TOOL_DEST"
     chmod +x "$UPDATE_TOOL_DEST"
+    # Libs do updater (não passar pelo linuxdeploy).
+    find "$EXTRACT_DIR/squashfs-root" -name 'libappimageupdate*.so*' -exec cp -a {} "$APPDIR/usr/lib/" \; || true
   else
     echo "Aviso: extraindo appimageupdatetool falhou; updates in-app podem não funcionar." >&2
   fi
   rm -rf "$EXTRACT_DIR"
 fi
 
-QMAKE_BIN="$(command -v qmake6 || command -v qmake-qt6 || command -v qmake || true)"
-if [[ -z "$QMAKE_BIN" ]]; then
-  echo "Erro: qmake6 não encontrado (necessário para linuxdeploy-plugin-qt)." >&2
-  exit 1
-fi
-export QMAKE="$QMAKE_BIN"
-export QML_SOURCES_PATHS="$ROOT/src/qml"
-export EXTRA_QT_PLUGINS="wayland;xcb;platforms;platformthemes;imageformats;iconengines;tls;networkinformation;generic"
-export EXTRA_PLATFORM_PLUGINS="libqxcb.so;libqwayland-generic.so;libqwayland-egl.so"
-
-echo "==> Empacotando dependências Qt/KF com linuxdeploy (qmake=$QMAKE)..."
-"$LINUXDEPLOY_BIN" \
-  --appdir "$APPDIR" \
-  --executable "$APPDIR/usr/bin/${BINARY}" \
-  --desktop-file "$APPDIR/usr/share/applications/${APP_ID}.desktop" \
-  --icon-file "$APPDIR/usr/share/icons/hicolor/scalable/apps/${APP_ID}.svg" \
-  --plugin qt
+# libxcb-* empacotado + libxcb.so do sistema = SIGSEGV em dl_init.
+# Preferir helpers X11/xcb do host (linuxdeploy já blacklist libxcb.so.1).
+rm -f "$APPDIR"/usr/lib/libxcb-*.so* || true
 
 copy_glob() {
   local pattern="$1"
@@ -176,26 +208,26 @@ for plugdir in /usr/lib64/qt6/plugins /usr/lib/qt6/plugins; do
   fi
 done
 
+# linuxdeploy deixa AppRun -> usr/bin/webappstation; escrever sem rm
+# seguiria o symlink e sobrescreveria o binário com este script.
+rm -f "$APPDIR/AppRun"
 cat > "$APPDIR/AppRun" << 'EOF'
 #!/bin/bash
 HERE="$(dirname "$(readlink -f "$0")")"
 export PATH="${HERE}/usr/bin:${PATH}"
-# Preferir libs do AppImage — não misturar Qt do sistema.
-export LD_LIBRARY_PATH="${HERE}/usr/lib:${HERE}/usr/lib64:${HERE}/usr/lib/x86_64-linux-gnu${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
-export QT_PLUGIN_PATH="${HERE}/usr/plugins:${HERE}/usr/lib/qt6/plugins:${HERE}/usr/lib64/qt6/plugins"
-export QML2_IMPORT_PATH="${HERE}/usr/qml:${HERE}/usr/lib/qml:${HERE}/usr/lib64/qml:${HERE}/usr/lib/qt6/qml"
+# NÃO exportar LD_LIBRARY_PATH: o binário já tem RPATH ($ORIGIN/../lib) e
+# qt.conf. Forçar usr/lib no LD_LIBRARY_PATH mistura libs e causa SIGSEGV
+# ao carregar plugins QML (ex.: Controls/Basic).
+export QT_PLUGIN_PATH="${HERE}/usr/plugins"
+export QML2_IMPORT_PATH="${HERE}/usr/qml:${HERE}/usr/lib/qml"
 export QML_IMPORT_PATH="$QML2_IMPORT_PATH"
 export XDG_DATA_DIRS="${HERE}/usr/share:/usr/share:/usr/local/share${XDG_DATA_DIRS:+:$XDG_DATA_DIRS}"
-# Evita o binário pegar QML/plugins do host com versão diferente.
 unset QT_ROOT_PATH
+# Evitar que o host injete outro Qt via LD_LIBRARY_PATH do usuário.
+unset LD_LIBRARY_PATH
 exec "${HERE}/usr/bin/webappstation" "$@"
 EOF
 chmod +x "$APPDIR/AppRun"
-
-if ! command -v zsyncmake >/dev/null 2>&1; then
-  echo "Erro: zsyncmake não encontrado (instale o pacote zsync)." >&2
-  exit 1
-fi
 
 UPDATE_INFO="gh-releases-zsync|brayanmonteiroo|web-app-station|latest|WebAppStation-*-x86_64.AppImage.zsync"
 ZSYNC_OUTPUT="${OUTPUT}.zsync"
@@ -212,9 +244,14 @@ if [[ ! -f "$OUTPUT" ]]; then
   exit 1
 fi
 
+# appimagetool -u gera .zsync; fallback com zsyncmake se disponível.
+if [[ ! -f "$ZSYNC_OUTPUT" ]] && command -v zsyncmake >/dev/null 2>&1; then
+  echo "==> Gerando .zsync com zsyncmake..."
+  zsyncmake -u "$(basename "$OUTPUT")" -o "$ZSYNC_OUTPUT" "$OUTPUT"
+fi
+
 if [[ ! -f "$ZSYNC_OUTPUT" ]]; then
-  echo "Erro: arquivo .zsync não foi gerado." >&2
-  exit 1
+  echo "Aviso: .zsync não gerado (updates via AppImageUpdate podem falhar)." >&2
 fi
 
 # Sanity: AppImage deve ser bem maior que ~14MB se Qt foi empacotado.
