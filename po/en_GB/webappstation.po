@@ -230,6 +230,15 @@ msgstr "Could not start the updater."
 msgid "Ferramenta de atualização (appimageupdatetool) não encontrada. Baixe a nova release em GitHub."
 msgstr "Update tool (appimageupdatetool) not found. Download the new release from GitHub."
 
+msgid "GitHub limitou consultas à API (rate limit). Tente de novo em alguns minutos."
+msgstr "GitHub rate-limited API requests. Try again in a few minutes."
+
+msgid "O atualizador encerrou de forma inesperada ao consultar o GitHub."
+msgstr "The updater crashed while contacting GitHub."
+
+msgid "Falha ao verificar atualizações."
+msgstr "Failed to check for updates."
+
 msgid "Não foi possível reiniciar a Estação de Aplicativos Web."
 msgstr "Could not restart Web App Station."
 

@@ -23,15 +23,28 @@ QStringList updaterCandidates()
         tools << QDir(qEnvironmentVariable("APPDIR"))
                      .filePath(QStringLiteral("usr/bin/appimageupdatetool"));
     }
-    const QString besideApp =
-        QCoreApplication::applicationDirPath()
-        + QStringLiteral("/appimageupdatetool");
-    if (!tools.contains(besideApp)) {
-        tools << besideApp;
-    }
+    // Binário ao lado do webappstation no AppDir montado (/tmp/.mount_*/usr/bin).
+    tools << (QCoreApplication::applicationDirPath()
+              + QStringLiteral("/appimageupdatetool"));
     tools << QStringLiteral("appimageupdatetool")
           << QStringLiteral("AppImageUpdate");
+    tools.removeDuplicates();
     return tools;
+}
+
+QString resolveUpdaterTool(const QString &candidate)
+{
+    if (candidate.isEmpty()) {
+        return {};
+    }
+    if (QFileInfo(candidate).isAbsolute()) {
+        const QFileInfo fi(candidate);
+        if (fi.exists() && fi.isExecutable()) {
+            return fi.absoluteFilePath();
+        }
+        return {};
+    }
+    return QStandardPaths::findExecutable(candidate);
 }
 
 void prepareUpdaterEnvironment(QProcess &proc, const QString &tool)
@@ -62,26 +75,51 @@ void prepareUpdaterEnvironment(QProcess &proc, const QString &tool)
     proc.setProcessEnvironment(env);
 }
 
-bool runUpdater(const QString &tool, const QStringList &args, QByteArray *stdoutOut,
-                QByteArray *stderrOut, int *exitCode)
+struct UpdaterRunResult {
+    bool started = false;
+    bool crashed = false;
+    int exitCode = -1;
+    QByteArray standardOutput;
+    QByteArray standardError;
+};
+
+UpdaterRunResult runUpdater(const QString &tool, const QStringList &args)
 {
+    UpdaterRunResult result;
     QProcess proc;
     prepareUpdaterEnvironment(proc, tool);
     proc.start(tool, args);
     if (!proc.waitForStarted(5000)) {
-        return false;
+        return result;
     }
+    result.started = true;
     proc.waitForFinished(-1);
-    if (stdoutOut) {
-        *stdoutOut = proc.readAllStandardOutput();
+    result.crashed = proc.exitStatus() == QProcess::CrashExit;
+    result.exitCode = proc.exitCode();
+    result.standardOutput = proc.readAllStandardOutput();
+    result.standardError = proc.readAllStandardError();
+    return result;
+}
+
+QString updaterFailureMessage(const UpdaterRunResult &run)
+{
+    const QString err = QString::fromUtf8(run.standardError).trimmed();
+    const QString out = QString::fromUtf8(run.standardOutput).trimmed();
+    const QString combined = err.isEmpty() ? out : err;
+    if (combined.contains(QStringLiteral("rate limit"), Qt::CaseInsensitive)
+        || combined.contains(QStringLiteral("HTTP status 403"))) {
+        return QStringLiteral("err_rate_limit");
     }
-    if (stderrOut) {
-        *stderrOut = proc.readAllStandardError();
+    if (run.crashed && !combined.isEmpty()) {
+        return QStringLiteral("err_msg:") + combined;
     }
-    if (exitCode) {
-        *exitCode = proc.exitCode();
+    if (!combined.isEmpty()) {
+        return QStringLiteral("err_msg:") + combined;
     }
-    return true;
+    if (run.crashed) {
+        return QStringLiteral("err_updater_crash");
+    }
+    return QStringLiteral("err_check_failed");
 }
 
 } // namespace
@@ -225,50 +263,81 @@ void UpdateService::checkAndApply(bool manual)
                         "encontrada. Baixe a nova release em GitHub."));
                     return;
                 }
+                if (result == QStringLiteral("err_rate_limit")) {
+                    Q_EMIT updateFailed(i18n(
+                        "GitHub limitou consultas à API (rate limit). Tente de "
+                        "novo em alguns minutos."));
+                    return;
+                }
+                if (result == QStringLiteral("err_updater_crash")) {
+                    Q_EMIT updateFailed(i18n(
+                        "O atualizador encerrou de forma inesperada ao "
+                        "consultar o GitHub."));
+                    return;
+                }
+                if (result == QStringLiteral("err_check_failed")) {
+                    Q_EMIT updateFailed(
+                        i18n("Falha ao verificar atualizações."));
+                    return;
+                }
+                if (result.startsWith(QStringLiteral("err_msg:"))) {
+                    Q_EMIT updateFailed(result.mid(8));
+                    return;
+                }
                 Q_EMIT updateFailed(result);
             });
 
     watcher->setFuture(QtConcurrent::run([path, tools]() -> QString {
-        for (const QString &tool : tools) {
-            if (QFileInfo::exists(tool) && !QFileInfo(tool).isExecutable()
-                && QFileInfo(tool).isAbsolute()) {
+        QString lastError;
+        bool foundTool = false;
+
+        for (const QString &candidate : tools) {
+            const QString tool = resolveUpdaterTool(candidate);
+            if (tool.isEmpty()) {
                 continue;
             }
+            foundTool = true;
 
-            QByteArray out;
-            QByteArray err;
-            int code = -1;
-            if (!runUpdater(tool, {QStringLiteral("-j"), path}, &out, &err,
-                            &code)) {
+            // -j: exit 0 = sem update, 1 = update disponível, outro = erro.
+            const UpdaterRunResult check =
+                runUpdater(tool, {QStringLiteral("-j"), path});
+            if (!check.started) {
+                lastError = QStringLiteral("err_start_updater");
                 continue;
             }
+            if (check.crashed) {
+                return updaterFailureMessage(check);
+            }
 
-            const bool hasUpdate = out.contains("\"update_available\": true")
+            const QByteArray &out = check.standardOutput;
+            const bool jsonSaysUpdate =
+                out.contains("\"update_available\": true")
                 || out.contains("\"update_available\":true");
-            if (code != 0 && !hasUpdate && !out.contains("update_available")) {
-                continue;
-            }
-            if (!hasUpdate) {
+            const bool hasUpdate = (check.exitCode == 1) || jsonSaysUpdate;
+
+            if (check.exitCode == 0 && !hasUpdate) {
                 return QStringLiteral("uptodate");
             }
+            if (!hasUpdate) {
+                return updaterFailureMessage(check);
+            }
 
-            QByteArray applyOut;
-            QByteArray applyErr;
-            int applyCode = -1;
-            if (!runUpdater(tool, {QStringLiteral("-O"), path}, &applyOut,
-                            &applyErr, &applyCode)) {
+            const UpdaterRunResult apply =
+                runUpdater(tool, {QStringLiteral("-O"), path});
+            if (!apply.started) {
                 return QStringLiteral("err_start_updater");
             }
-            if (applyCode != 0) {
-                const QString msg =
-                    QString::fromUtf8(applyErr).trimmed();
-                return msg.isEmpty() ? QString::fromUtf8(applyOut).trimmed()
-                                     : msg;
+            if (apply.crashed || apply.exitCode != 0) {
+                return updaterFailureMessage(apply);
             }
             return QStringLiteral("updated:") + path;
         }
 
-        return QStringLiteral("err_no_tool");
+        if (!foundTool) {
+            return QStringLiteral("err_no_tool");
+        }
+        return lastError.isEmpty() ? QStringLiteral("err_start_updater")
+                                   : lastError;
     }));
 }
 
