@@ -15,9 +15,9 @@ jobs:
   appimage:
     name: Build AppImage
     runs-on: ubuntu-24.04
-    # Ubuntu 24.04 não tem KF6; build no Fedora (mesmo stack do README).
+    # Ubuntu 24.04 não tem KF6; build no Fedora recente (Qt/KF alinhados ao desktop atual).
     container:
-      image: fedora:42
+      image: fedora:44
 
     steps:
       - name: Install dependencies
@@ -28,9 +28,8 @@ jobs:
             kf6-kirigami-devel kf6-ki18n-devel kf6-kcoreaddons-devel \
             kf6-kconfig-devel kf6-kiconthemes-devel kf6-qqc2-desktop-style \
             kf6-kirigami kf6-breeze-icons \
-            zsync curl file which desktop-file-utils
+            zsync curl file which desktop-file-utils patchelf
           command -v qmake6 || command -v qmake-qt6
-          # Opcional: FUSE (ferramentas já usam --appimage-extract).
           dnf install -y fuse fuse-libs || true
 
       - name: Checkout

@@ -181,10 +181,27 @@ copy_glob() {
   done
 }
 
-# KF6 / Kirigami (além do que o plugin Qt puxar)
-copy_glob "/usr/lib64/libKF6*.so*" "$APPDIR/usr/lib"
-copy_glob "/usr/lib64/libKirigami*.so*" "$APPDIR/usr/lib"
-copy_glob "/usr/lib64/libkirigami*.so*" "$APPDIR/usr/lib"
+# KF6 / Kirigami (além do que o plugin Qt puxar).
+# Só copia o que ainda falta — não sobrescrever libs já patchelfadas pelo linuxdeploy.
+copy_missing_glob() {
+  local pattern="$1"
+  local dest="$2"
+  mkdir -p "$dest"
+  # shellcheck disable=SC2086
+  for f in $pattern; do
+    [[ -e "$f" ]] || continue
+    local base
+    base="$(basename "$f")"
+    if [[ -e "$dest/$base" ]]; then
+      continue
+    fi
+    cp -a "$f" "$dest/"
+  done
+}
+
+copy_missing_glob "/usr/lib64/libKF6*.so*" "$APPDIR/usr/lib"
+copy_missing_glob "/usr/lib64/libKirigami*.so*" "$APPDIR/usr/lib"
+copy_missing_glob "/usr/lib64/libkirigami*.so*" "$APPDIR/usr/lib"
 
 # QML org.kde.* (Kirigami, desktop style, etc.)
 mkdir -p "$APPDIR/usr/qml/org" "$APPDIR/usr/lib/qml/org"
@@ -220,6 +237,25 @@ for plugdir in /usr/lib64/qt6/plugins /usr/lib/qt6/plugins; do
     cp -a "$plugdir/." "$APPDIR/usr/plugins/" || true
   fi
 done
+
+# DT_RPATH ($ORIGIN) nas libs/plugins faz o loader preferir tudo do AppDir e
+# no Fedora recente o plugin libqxcb.so aborta em dl_init. O binário deve
+# usar DT_RUNPATH (não herdado) e deixar deps transitivas do KF virem do
+# host — desde que o Qt empacotado seja o mesmo da distro de build (fedora:44).
+if command -v patchelf >/dev/null 2>&1; then
+  echo "==> Normalizando RPATH (RUNPATH só no binário)..."
+  find "$APPDIR/usr/lib" "$APPDIR/usr/plugins" "$APPDIR/usr/qml" \
+    -type f \( -name '*.so' -o -name '*.so.*' \) -print0 2>/dev/null \
+    | while IFS= read -r -d '' f; do
+        patchelf --remove-rpath "$f" 2>/dev/null || true
+      done
+  if [[ -x "$APPDIR/usr/bin/${BINARY}" ]]; then
+    # sem --force-rpath => DT_RUNPATH
+    patchelf --set-rpath '$ORIGIN/../lib' "$APPDIR/usr/bin/${BINARY}" || true
+  fi
+else
+  echo "Aviso: patchelf ausente — RPATHs do linuxdeploy podem ficar agressivos." >&2
+fi
 
 # linuxdeploy deixa AppRun -> usr/bin/webappstation; escrever sem rm
 # seguiria o symlink e sobrescreveria o binário com este script.
