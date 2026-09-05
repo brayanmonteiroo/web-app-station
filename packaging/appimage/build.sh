@@ -83,6 +83,8 @@ extract_appimage "$APPIMAGETOOL" "$TOOLS_DIR/appimagetool"
 rm -f "$TOOLS_DIR/linuxdeploy/squashfs-root/usr/bin/strip" \
       "$TOOLS_DIR/linuxdeploy-qt/squashfs-root/usr/bin/strip" || true
 export NO_STRIP="${NO_STRIP:-1}"
+# Em containers sem FUSE, AppImages filhos falham com 127.
+export APPIMAGE_EXTRACT_AND_RUN=1
 
 LINUXDEPLOY_BIN="$TOOLS_DIR/linuxdeploy/squashfs-root/AppRun"
 # Plugin precisa estar no PATH com nome linuxdeploy-plugin-qt
@@ -92,6 +94,17 @@ if [[ -x "$PLUGIN_DIR/AppRun" ]]; then
 fi
 export PATH="$TOOLS_DIR:$PATH"
 APPIMAGETOOL_BIN="$TOOLS_DIR/appimagetool/squashfs-root/AppRun"
+
+# linuxdeploy prioriza *.AppImage no CWD sobre o plugin extraído no PATH.
+# Sem FUSE no CI isso dá exit 127 em --plugin-api-version.
+chmod a-x "$LINUXDEPLOY" "$LINUXDEPLOY_QT" "$APPIMAGETOOL" 2>/dev/null || true
+
+if ! "$TOOLS_DIR/linuxdeploy-plugin-qt" --plugin-api-version >/dev/null 2>&1; then
+  echo "Erro: linuxdeploy-plugin-qt extraído não responde a --plugin-api-version." >&2
+  "$TOOLS_DIR/linuxdeploy-plugin-qt" --plugin-api-version || true
+  exit 1
+fi
+echo "==> Plugin Qt OK (extraído): $(command -v linuxdeploy-plugin-qt)"
 
 QMAKE_BIN="$(command -v qmake6 || command -v qmake-qt6 || command -v qmake || true)"
 if [[ -z "$QMAKE_BIN" ]]; then
