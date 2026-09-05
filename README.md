@@ -73,7 +73,7 @@ Artefatos:
 - `WebAppStation-<versão>-x86_64.AppImage`
 - `WebAppStation-<versão>-x86_64.AppImage.zsync`
 
-Em tags `v*`, o GitHub Actions publica esses arquivos na release. Dentro do AppImage, o botão de atualização verifica e aplica a nova versão e pede para reiniciar.
+Em tags `v*`, o GitHub Actions (container Fedora) publica esses arquivos na release. Dentro do AppImage, o botão de atualização verifica e aplica a nova versão e pede para reiniciar.
 
 ## Licença
 

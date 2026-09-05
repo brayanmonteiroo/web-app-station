@@ -15,28 +15,26 @@ jobs:
   appimage:
     name: Build AppImage
     runs-on: ubuntu-24.04
+    # Ubuntu 24.04 não tem KF6; build no Fedora (mesmo stack do README).
+    container:
+      image: fedora:42
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
       - name: Install dependencies
         run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            cmake ninja-build g++ extra-cmake-modules \
-            qt6-base-dev qt6-declarative-dev qt6-tools-dev \
-            libkf6kirigami-dev libkf6i18n-dev libkf6coreaddons-dev \
-            libkf6config-dev libkf6iconthemes-dev \
-            qml6-module-org-kde-kirigami \
-            kde-style-breeze-qt6 \
-            libfuse2t64 zsync curl \
-            || sudo apt-get install -y \
-              cmake ninja-build g++ extra-cmake-modules \
-              qt6-base-dev qt6-declarative-dev \
-              libkf6kirigami2-dev libkf6i18n-dev libkf6coreaddons-dev \
-              libkf6config-dev libkf6iconthemes-dev \
-              libfuse2 zsync curl
+          dnf install -y \
+            git cmake ninja-build gcc-c++ extra-cmake-modules gettext \
+            qt6-qtbase-devel qt6-qtdeclarative-devel \
+            kf6-kirigami-devel kf6-ki18n-devel kf6-kcoreaddons-devel \
+            kf6-kconfig-devel kf6-kiconthemes-devel kf6-qqc2-desktop-style \
+            kf6-kirigami kf6-breeze-icons \
+            qml6-qtquickcontrols2 \
+            zsync curl file which desktop-file-utils
+          # Opcional: FUSE. O build.sh já usa --appimage-extract-and-run.
+          dnf install -y fuse fuse-libs || true
+
+      - name: Checkout
+        uses: actions/checkout@v4
 
       - name: Build AppImage
         run: |
@@ -51,6 +49,7 @@ jobs:
             WebAppStation-*.AppImage
             WebAppStation-*.AppImage.zsync
           generate_release_notes: true
+          fail_on_unmatched_files: true
 
       - name: Upload artifact
         if: github.event_name == 'workflow_dispatch'
