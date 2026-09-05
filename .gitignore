@@ -6,6 +6,9 @@
 *.AppImage.zsync
 appimagetool
 appimageupdatetool-x86_64.AppImage
+.linuxdeploy*
+.appimage-tools/
+.appimageupdatetool-extract/
 linuxdeploy*
 .cache/
 *.user

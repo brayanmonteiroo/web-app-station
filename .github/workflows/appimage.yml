@@ -24,12 +24,13 @@ jobs:
         run: |
           dnf install -y \
             git cmake ninja-build gcc-c++ extra-cmake-modules gettext \
-            qt6-qtbase-devel qt6-qtdeclarative-devel \
+            qt6-qtbase-devel qt6-qtdeclarative-devel qt6-qtwayland \
             kf6-kirigami-devel kf6-ki18n-devel kf6-kcoreaddons-devel \
             kf6-kconfig-devel kf6-kiconthemes-devel kf6-qqc2-desktop-style \
             kf6-kirigami kf6-breeze-icons \
             zsync curl file which desktop-file-utils
-          # Opcional: FUSE. O build.sh já usa --appimage-extract-and-run.
+          command -v qmake6 || command -v qmake-qt6
+          # Opcional: FUSE (ferramentas já usam --appimage-extract).
           dnf install -y fuse fuse-libs || true
 
       - name: Checkout
