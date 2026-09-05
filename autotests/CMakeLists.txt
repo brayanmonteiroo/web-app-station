@@ -26,6 +26,7 @@ webappstation_add_test(tst_execbuilder tst_execbuilder.cpp)
 webappstation_add_test(tst_webappmanager tst_webappmanager.cpp)
 webappstation_add_test(tst_firefoxprofile tst_firefoxprofile.cpp)
 webappstation_add_test(tst_windowicon tst_windowicon.cpp)
+webappstation_add_test(tst_locale tst_locale.cpp)
 
 add_executable(tst_qmlsources tst_qmlsources.cpp)
 target_compile_definitions(tst_qmlsources

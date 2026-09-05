@@ -6,15 +6,22 @@ import org.kde.kirigami as Kirigami
 
 Kirigami.Page {
     id: page
-    title: i18n("Web Apps")
+    title: i18n("Aplicativos Web")
 
     actions: [
+        Kirigami.Action {
+            text: i18n("Atualizações")
+            icon.name: "system-software-update"
+            visible: App.updateService.appImage && !App.updateService.updatesDisabled()
+            enabled: !App.updateService.busy
+            onTriggered: App.updateService.checkAndApply(true)
+        },
         Kirigami.Action {
             text: i18n("Adicionar")
             icon.name: "list-add"
             shortcut: "Ctrl+N"
             enabled: App.hasBrowsers
-            tooltip: App.hasBrowsers ? i18n("Adicionar um novo Web App")
+            tooltip: App.hasBrowsers ? i18n("Adicionar um novo aplicativo web")
                                      : i18n("Nenhum navegador suportado foi detectado.")
             onTriggered: pageStack.push(Qt.createComponent("org.kde.webappstation", "WebAppEditorPage"), {
                 editMode: false,
@@ -43,13 +50,6 @@ Kirigami.Page {
             icon.name: "media-playback-start"
             enabled: list.currentIndex >= 0
             onTriggered: App.launchWebApp(list.currentIndex)
-        },
-        Kirigami.Action {
-            text: i18n("Verificar atualizações")
-            icon.name: "system-software-update"
-            visible: App.updateService.appImage && !App.updateService.updatesDisabled()
-            enabled: !App.updateService.busy
-            onTriggered: App.updateService.checkAndApply(true)
         }
     ]
 
@@ -100,7 +100,7 @@ Kirigami.Page {
         anchors.centerIn: parent
         width: parent.width - Kirigami.Units.gridUnit * 4
         visible: list.count === 0
-        text: i18n("Nenhum Web App ainda")
+        text: i18n("Nenhum aplicativo web ainda")
         explanation: App.hasBrowsers
             ? i18n("Execute sites como se fossem aplicativos")
             : i18n("Nenhum navegador suportado foi detectado.")
@@ -133,7 +133,7 @@ Kirigami.Page {
                 Layout.fillWidth: true
             }
             Controls.Label {
-                text: i18n("Este Web App será perdido permanentemente.")
+                text: i18n("Este aplicativo web será perdido permanentemente.")
                 wrapMode: Text.WordWrap
                 Layout.fillWidth: true
                 opacity: 0.8

@@ -10,7 +10,7 @@ Kirigami.ScrollablePage {
     property bool editMode: false
     property int editIndex: -1
 
-    title: editMode ? i18n("Editar Web App") : i18n("Adicionar Web App")
+    title: editMode ? i18n("Editar aplicativo web") : i18n("Adicionar aplicativo web")
 
     property string selectedIcon: "org.kde.webappstation"
     property int browserIndex: 0
@@ -105,7 +105,7 @@ Kirigami.ScrollablePage {
         Controls.TextField {
             id: descField
             Layout.fillWidth: true
-            placeholderText: i18n("Web App")
+            placeholderText: i18n("Aplicativo web")
         }
 
         Controls.Label {
@@ -225,7 +225,7 @@ Kirigami.ScrollablePage {
             }
             Controls.Label {
                 Layout.fillWidth: true
-                text: i18n("Mostra a barra de navegação do Firefox neste Web App.")
+                text: i18n("Mostra a barra de navegação do Firefox neste aplicativo web.")
                 wrapMode: Text.WordWrap
                 opacity: 0.75
                 font: Kirigami.Theme.smallFont

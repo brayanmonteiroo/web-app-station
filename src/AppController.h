@@ -2,6 +2,7 @@
 #pragma once
 
 #include "FaviconService.h"
+#include "LocaleService.h"
 #include "UpdateService.h"
 #include "WebAppManager.h"
 
@@ -54,6 +55,7 @@ class AppController : public QObject
     Q_PROPERTY(WebAppListModel *webApps READ webApps CONSTANT)
     Q_PROPERTY(FaviconService *faviconService READ faviconService CONSTANT)
     Q_PROPERTY(UpdateService *updateService READ updateService CONSTANT)
+    Q_PROPERTY(LocaleService *localeService READ localeService CONSTANT)
     Q_PROPERTY(QString version READ version CONSTANT)
     Q_PROPERTY(QVariantList browsers READ browsers NOTIFY browsersChanged)
     Q_PROPERTY(QVariantList categories READ categories CONSTANT)
@@ -66,6 +68,7 @@ public:
     WebAppListModel *webApps() const { return m_model; }
     FaviconService *faviconService() const { return m_favicon; }
     UpdateService *updateService() const { return m_update; }
+    LocaleService *localeService() const { return m_locale; }
     QString version() const
     {
         return QStringLiteral(WEBAPPSTATION_VERSION);
@@ -97,6 +100,7 @@ private:
     WebAppListModel *m_model = nullptr;
     FaviconService *m_favicon = nullptr;
     UpdateService *m_update = nullptr;
+    LocaleService *m_locale = nullptr;
     QVariantList m_browsers;
     QList<Browser> m_browserObjects;
     QString m_statusMessage;

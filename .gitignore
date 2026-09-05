@@ -16,3 +16,4 @@ linuxdeploy*
 .idea/
 .vscode/
 compile_commands.json
+/build-agent/

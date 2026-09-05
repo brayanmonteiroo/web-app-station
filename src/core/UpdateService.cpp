@@ -9,9 +9,71 @@
 #include <QFileInfo>
 #include <QFutureWatcher>
 #include <QProcess>
+#include <QProcessEnvironment>
 #include <QStandardPaths>
 #include <QTextStream>
 #include <QtConcurrent>
+
+namespace {
+
+QStringList updaterCandidates()
+{
+    QStringList tools;
+    if (qEnvironmentVariableIsSet("APPDIR")) {
+        tools << QDir(qEnvironmentVariable("APPDIR"))
+                     .filePath(QStringLiteral("usr/bin/appimageupdatetool"));
+    }
+    const QString besideApp =
+        QCoreApplication::applicationDirPath()
+        + QStringLiteral("/appimageupdatetool");
+    if (!tools.contains(besideApp)) {
+        tools << besideApp;
+    }
+    tools << QStringLiteral("appimageupdatetool")
+          << QStringLiteral("AppImageUpdate");
+    return tools;
+}
+
+void prepareUpdaterEnvironment(QProcess &proc, const QString &tool)
+{
+    QProcessEnvironment env = QProcessEnvironment::systemEnvironment();
+    const QFileInfo fi(tool);
+    if (fi.isAbsolute()) {
+        const QString libDir =
+            QDir::cleanPath(fi.absolutePath() + QStringLiteral("/../lib"));
+        if (QDir(libDir).exists()) {
+            const QString existing = env.value(QStringLiteral("LD_LIBRARY_PATH"));
+            env.insert(QStringLiteral("LD_LIBRARY_PATH"),
+                       existing.isEmpty() ? libDir
+                                          : (libDir + QLatin1Char(':') + existing));
+        }
+    }
+    proc.setProcessEnvironment(env);
+}
+
+bool runUpdater(const QString &tool, const QStringList &args, QByteArray *stdoutOut,
+                QByteArray *stderrOut, int *exitCode)
+{
+    QProcess proc;
+    prepareUpdaterEnvironment(proc, tool);
+    proc.start(tool, args);
+    if (!proc.waitForStarted(5000)) {
+        return false;
+    }
+    proc.waitForFinished(-1);
+    if (stdoutOut) {
+        *stdoutOut = proc.readAllStandardOutput();
+    }
+    if (stderrOut) {
+        *stderrOut = proc.readAllStandardError();
+    }
+    if (exitCode) {
+        *exitCode = proc.exitCode();
+    }
+    return true;
+}
+
+} // namespace
 
 UpdateService::UpdateService(QObject *parent)
     : QObject(parent)
@@ -123,6 +185,7 @@ void UpdateService::checkAndApply(bool manual)
     }
 
     const QString path = appImagePath();
+    const QStringList tools = updaterCandidates();
     auto *watcher = new QFutureWatcher<QString>(this);
     connect(watcher, &QFutureWatcher<QString>::finished, this,
             [this, watcher, manual]() {
@@ -154,45 +217,42 @@ void UpdateService::checkAndApply(bool manual)
                 Q_EMIT updateFailed(result);
             });
 
-    watcher->setFuture(QtConcurrent::run([path]() -> QString {
-        // Prefer AppImageUpdate / appimageupdatetool when available.
-        const QStringList tools = {
-            QCoreApplication::applicationDirPath()
-                + QStringLiteral("/appimageupdatetool"),
-            QStringLiteral("appimageupdatetool"),
-            QStringLiteral("AppImageUpdate"),
-        };
-
+    watcher->setFuture(QtConcurrent::run([path, tools]() -> QString {
         for (const QString &tool : tools) {
-            QProcess proc;
-            proc.start(tool, {QStringLiteral("-j"), path});
-            if (!proc.waitForStarted(3000)) {
+            if (QFileInfo::exists(tool) && !QFileInfo(tool).isExecutable()
+                && QFileInfo(tool).isAbsolute()) {
                 continue;
             }
-            proc.waitForFinished(-1);
-            const QByteArray out = proc.readAllStandardOutput();
-            const bool hasUpdate =
-                out.contains("\"update_available\": true")
+
+            QByteArray out;
+            QByteArray err;
+            int code = -1;
+            if (!runUpdater(tool, {QStringLiteral("-j"), path}, &out, &err,
+                            &code)) {
+                continue;
+            }
+
+            const bool hasUpdate = out.contains("\"update_available\": true")
                 || out.contains("\"update_available\":true");
-            if (proc.exitCode() != 0 && !hasUpdate
-                && !out.contains("update_available")) {
-                // Tool exists but check failed — try next or apply anyway path
-                if (!hasUpdate) {
-                    continue;
-                }
+            if (code != 0 && !hasUpdate && !out.contains("update_available")) {
+                continue;
             }
             if (!hasUpdate) {
                 return QStringLiteral("uptodate");
             }
 
-            QProcess apply;
-            apply.start(tool, {QStringLiteral("-O"), path});
-            if (!apply.waitForStarted(3000)) {
+            QByteArray applyOut;
+            QByteArray applyErr;
+            int applyCode = -1;
+            if (!runUpdater(tool, {QStringLiteral("-O"), path}, &applyOut,
+                            &applyErr, &applyCode)) {
                 return QStringLiteral("err_start_updater");
             }
-            apply.waitForFinished(-1);
-            if (apply.exitCode() != 0) {
-                return QString::fromUtf8(apply.readAllStandardError()).trimmed();
+            if (applyCode != 0) {
+                const QString msg =
+                    QString::fromUtf8(applyErr).trimmed();
+                return msg.isEmpty() ? QString::fromUtf8(applyOut).trimmed()
+                                     : msg;
             }
             return QStringLiteral("updated:") + path;
         }
@@ -208,8 +268,8 @@ void UpdateService::restart()
         return;
     }
     if (!QProcess::startDetached(path, {})) {
-        Q_EMIT updateFailed(
-            i18n("Não foi possível reiniciar o Web App Station."));
+        Q_EMIT updateFailed(i18n(
+            "Não foi possível reiniciar a Estação de Aplicativos Web."));
         return;
     }
     QCoreApplication::quit();

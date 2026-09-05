@@ -11,6 +11,7 @@
 #include "AppController.h"
 #include "BrowserDetector.h"
 #include "FaviconService.h"
+#include "LocaleService.h"
 #include "Paths.h"
 #include "UpdateService.h"
 
@@ -190,6 +191,22 @@ private Q_SLOTS:
         QSignalSpy spy(&updates, &UpdateService::updateFailed);
         updates.checkAndApply(true);
         QCOMPARE(spy.count(), 1);
+    }
+
+    void locale_pref_roundTrip()
+    {
+        LocaleService locale;
+        QCOMPARE(locale.language(), QStringLiteral("system"));
+        QSignalSpy restartSpy(&locale, &LocaleService::restartRequired);
+        locale.setLanguage(QStringLiteral("en"));
+        QCOMPARE(locale.language(), QStringLiteral("en"));
+        QCOMPARE(restartSpy.count(), 1);
+        locale.setLanguage(QStringLiteral("pt_BR"));
+        QCOMPARE(locale.language(), QStringLiteral("pt_BR"));
+        QVERIFY(QFile::exists(m_home.configDir()
+                              + QStringLiteral("/ui.conf")));
+        locale.setLanguage(QStringLiteral("system"));
+        QCOMPARE(locale.language(), QStringLiteral("system"));
     }
 
 private:

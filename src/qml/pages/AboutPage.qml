@@ -28,7 +28,7 @@ Kirigami.ScrollablePage {
         }
 
         Kirigami.Heading {
-            text: i18n("Web Apps")
+            text: i18n("Estação de Aplicativos Web")
             Layout.alignment: Qt.AlignHCenter
             level: 1
         }

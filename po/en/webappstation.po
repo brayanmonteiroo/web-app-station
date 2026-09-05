@@ -14,10 +14,10 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
 
-msgid "Web Apps"
+msgid "Aplicativos Web"
 msgstr "Web Apps"
 
-msgid "Web App Station"
+msgid "Estação de Aplicativos Web"
 msgstr "Web App Station"
 
 msgid "Atalhos de teclado"
@@ -29,13 +29,28 @@ msgstr "About"
 msgid "Sair"
 msgstr "Quit"
 
+msgid "Idioma"
+msgstr "Language"
+
+msgid "Português"
+msgstr "Portuguese"
+
+msgid "English"
+msgstr "English"
+
+msgid "Sistema"
+msgstr "System"
+
+msgid "Reinicie o aplicativo para aplicar o idioma."
+msgstr "Restart the application to apply the language."
+
 msgid "Já está na versão mais recente."
 msgstr "Already up to date."
 
 msgid "Verificar atualizações?"
 msgstr "Check for updates?"
 
-msgid "Deseja que o Web App Station verifique atualizações automaticamente quando aberto pelo AppImage?"
+msgid "Deseja que a Estação de Aplicativos Web verifique atualizações automaticamente quando aberto pelo AppImage?"
 msgstr "Should Web App Station automatically check for updates when launched from the AppImage?"
 
 msgid "Atualização instalada"
@@ -53,8 +68,8 @@ msgstr "Later"
 msgid "Adicionar"
 msgstr "Add"
 
-msgid "Adicionar um novo Web App"
-msgstr "Add a new Web App"
+msgid "Adicionar um novo aplicativo web"
+msgstr "Add a new web app"
 
 msgid "Nenhum navegador suportado foi detectado."
 msgstr "No supported browsers were detected."
@@ -68,11 +83,11 @@ msgstr "Remove"
 msgid "Abrir"
 msgstr "Launch"
 
-msgid "Verificar atualizações"
-msgstr "Check for updates"
+msgid "Atualizações"
+msgstr "Updates"
 
-msgid "Nenhum Web App ainda"
-msgstr "No Web Apps yet"
+msgid "Nenhum aplicativo web ainda"
+msgstr "No web apps yet"
 
 msgid "Execute sites como se fossem aplicativos"
 msgstr "Run websites as if they were apps"
@@ -83,14 +98,14 @@ msgstr "Delete '%1'"
 msgid "Tem certeza de que deseja excluir '%1'?"
 msgstr "Are you sure you want to delete '%1'?"
 
-msgid "Este Web App será perdido permanentemente."
-msgstr "This Web App will be permanently lost."
+msgid "Este aplicativo web será perdido permanentemente."
+msgstr "This web app will be permanently lost."
 
-msgid "Editar Web App"
-msgstr "Edit Web App"
+msgid "Editar aplicativo web"
+msgstr "Edit web app"
 
-msgid "Adicionar Web App"
-msgstr "Add a New Web App"
+msgid "Adicionar aplicativo web"
+msgstr "Add a new web app"
 
 msgid "Salvar"
 msgstr "Save"
@@ -107,8 +122,8 @@ msgstr "Website name"
 msgid "Descrição"
 msgstr "Description"
 
-msgid "Web App"
-msgstr "Web App"
+msgid "Aplicativo web"
+msgstr "Web app"
 
 msgid "Endereço"
 msgstr "Address"
@@ -140,8 +155,8 @@ msgstr "If enabled, the site uses its own profile (separate login). If disabled 
 msgid "Barra de navegação"
 msgstr "Navigation bar"
 
-msgid "Mostra a barra de navegação do Firefox neste Web App."
-msgstr "Shows the Firefox navigation bar in this Web App."
+msgid "Mostra a barra de navegação do Firefox neste aplicativo web."
+msgstr "Shows the Firefox navigation bar in this web app."
 
 msgid "Janela privada / anônima"
 msgstr "Private / Incognito Window"
@@ -215,7 +230,7 @@ msgstr "Could not start the updater."
 msgid "Ferramenta de atualização (appimageupdatetool) não encontrada. Baixe a nova release em GitHub."
 msgstr "Update tool (appimageupdatetool) not found. Download the new release from GitHub."
 
-msgid "Não foi possível reiniciar o Web App Station."
+msgid "Não foi possível reiniciar a Estação de Aplicativos Web."
 msgstr "Could not restart Web App Station."
 
 msgid "© 2026 Brayan Monteiro"

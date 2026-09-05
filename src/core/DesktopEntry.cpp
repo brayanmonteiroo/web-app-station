@@ -50,7 +50,8 @@ WebApp DesktopEntry::parse(const QString &path, const QString &codename)
             app.setName(line.mid(5));
         } else if (line.startsWith(QStringLiteral("Comment="))) {
             QString desc = line.mid(8);
-            if (desc == QStringLiteral("Web App")) {
+            if (desc == QStringLiteral("Web App")
+                || desc == QStringLiteral("Aplicativo web")) {
                 desc.clear();
             }
             app.setDescription(desc);
@@ -145,7 +146,7 @@ bool DesktopEntry::write(const WebApp &app, const QString &execLine)
 
     QString desc = app.description().trimmed();
     if (desc.isEmpty()) {
-        desc = QStringLiteral("Web App");
+        desc = QStringLiteral("Aplicativo web");
     }
 
     QTextStream out(&file);

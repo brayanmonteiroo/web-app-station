@@ -96,6 +96,7 @@ AppController::AppController(QObject *parent)
     , m_model(new WebAppListModel(&m_manager, this))
     , m_favicon(new FaviconService(this))
     , m_update(new UpdateService(this))
+    , m_locale(new LocaleService(this))
 {
     reloadBrowsers();
 }
@@ -208,9 +209,9 @@ bool AppController::createWebApp(const QVariantMap &data)
 
     if (ok) {
         m_model->reload();
-        setStatus(QStringLiteral("Web App criada."));
+        setStatus(QStringLiteral("Aplicativo web criado."));
     } else {
-        setStatus(QStringLiteral("Falha ao criar Web App."));
+        setStatus(QStringLiteral("Falha ao criar aplicativo web."));
     }
     return ok;
 }
@@ -259,9 +260,9 @@ bool AppController::editWebApp(int index, const QVariantMap &data)
 
     if (ok) {
         m_model->reload();
-        setStatus(QStringLiteral("Web App atualizada."));
+        setStatus(QStringLiteral("Aplicativo web atualizado."));
     } else {
-        setStatus(QStringLiteral("Falha ao editar Web App."));
+        setStatus(QStringLiteral("Falha ao editar aplicativo web."));
     }
     return ok;
 }
@@ -274,8 +275,8 @@ bool AppController::deleteWebApp(int index)
     }
     const bool ok = m_manager.deleteWebApp(app);
     m_model->reload();
-    setStatus(ok ? QStringLiteral("Web App removida.")
-                 : QStringLiteral("Falha ao remover Web App."));
+    setStatus(ok ? QStringLiteral("Aplicativo web removido.")
+                 : QStringLiteral("Falha ao remover aplicativo web."));
     return ok;
 }
 

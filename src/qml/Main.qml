@@ -6,7 +6,7 @@ import org.kde.kirigami as Kirigami
 
 Kirigami.ApplicationWindow {
     id: root
-    title: i18n("Web Apps")
+    title: i18n("Aplicativos Web")
     minimumWidth: Kirigami.Units.gridUnit * 28
     minimumHeight: Kirigami.Units.gridUnit * 24
     width: Kirigami.Units.gridUnit * 46
@@ -18,10 +18,41 @@ Kirigami.ApplicationWindow {
     pageStack.initialPage: WebAppListPage {}
 
     globalDrawer: Kirigami.GlobalDrawer {
-        title: i18n("Web App Station")
+        title: i18n("Estação de Aplicativos Web")
         titleIcon: "org.kde.webappstation"
         isMenu: true
         actions: [
+            Kirigami.Action {
+                text: i18n("Idioma")
+                icon.name: "preferences-desktop-locale"
+                Kirigami.Action {
+                    text: i18n("Português")
+                    checkable: true
+                    checked: App.localeService.language === "pt_BR"
+                    onTriggered: {
+                        App.localeService.setLanguage("pt_BR")
+                        languageRestartDialog.open()
+                    }
+                }
+                Kirigami.Action {
+                    text: i18n("English")
+                    checkable: true
+                    checked: App.localeService.language === "en"
+                    onTriggered: {
+                        App.localeService.setLanguage("en")
+                        languageRestartDialog.open()
+                    }
+                }
+                Kirigami.Action {
+                    text: i18n("Sistema")
+                    checkable: true
+                    checked: App.localeService.language === "system"
+                    onTriggered: {
+                        App.localeService.setLanguage("system")
+                        languageRestartDialog.open()
+                    }
+                }
+            },
             Kirigami.Action {
                 text: i18n("Atalhos de teclado")
                 icon.name: "configure-shortcuts"
@@ -60,6 +91,13 @@ Kirigami.ApplicationWindow {
         }
     }
 
+    Connections {
+        target: App.localeService
+        function onRestartFailed(error) {
+            applicationWindow().showPassiveNotification(error)
+        }
+    }
+
     Component.onCompleted: {
         if (!App.updateService.appImage || App.updateService.updatesDisabled()) {
             return
@@ -86,7 +124,7 @@ Kirigami.ApplicationWindow {
         anchors.centerIn: parent
         standardButtons: Controls.Dialog.Yes | Controls.Dialog.No
         contentItem: Controls.Label {
-            text: i18n("Deseja que o Web App Station verifique atualizações automaticamente quando aberto pelo AppImage?")
+            text: i18n("Deseja que a Estação de Aplicativos Web verifique atualizações automaticamente quando aberto pelo AppImage?")
             wrapMode: Text.WordWrap
             width: Kirigami.Units.gridUnit * 24
         }
@@ -121,6 +159,33 @@ Kirigami.ApplicationWindow {
                 text: i18n("Depois")
                 Controls.DialogButtonBox.buttonRole: Controls.DialogButtonBox.RejectRole
                 onClicked: restartDialog.close()
+            }
+        }
+    }
+
+    Controls.Dialog {
+        id: languageRestartDialog
+        title: i18n("Idioma")
+        modal: true
+        anchors.centerIn: parent
+        contentItem: Controls.Label {
+            text: i18n("Reinicie o aplicativo para aplicar o idioma.")
+            wrapMode: Text.WordWrap
+            width: Kirigami.Units.gridUnit * 24
+        }
+        footer: Controls.DialogButtonBox {
+            Controls.Button {
+                text: i18n("Reiniciar agora")
+                Controls.DialogButtonBox.buttonRole: Controls.DialogButtonBox.AcceptRole
+                onClicked: {
+                    languageRestartDialog.close()
+                    App.localeService.restartApp()
+                }
+            }
+            Controls.Button {
+                text: i18n("Depois")
+                Controls.DialogButtonBox.buttonRole: Controls.DialogButtonBox.RejectRole
+                onClicked: languageRestartDialog.close()
             }
         }
     }

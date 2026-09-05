@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 #include "AppController.h"
+#include "LocaleService.h"
 
 #include <KAboutData>
 #include <KLocalizedQmlContext>
@@ -13,12 +14,16 @@
 
 int main(int argc, char *argv[])
 {
+    // Preferência de idioma antes do domínio KI18n / QApplication i18n.
+    LocaleService::applyFromConfigEarly();
+
     QApplication app(argc, argv);
     KLocalizedString::setApplicationDomain("webappstation");
+    LocaleService::finishI18nSetup();
 
     KAboutData about(
         QStringLiteral("webappstation"),
-        i18n("Web App Station"),
+        i18n("Estação de Aplicativos Web"),
         QStringLiteral(WEBAPPSTATION_VERSION),
         i18n("Execute sites como se fossem aplicativos"),
         KAboutLicense::MIT,

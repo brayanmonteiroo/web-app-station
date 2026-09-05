@@ -149,21 +149,23 @@ UPDATE_TOOL_URL="https://github.com/AppImageCommunity/AppImageUpdate/releases/do
 UPDATE_TOOL_AI="$ROOT/appimageupdatetool-x86_64.AppImage"
 UPDATE_TOOL_DEST="$APPDIR/usr/bin/appimageupdatetool"
 mkdir -p "$APPDIR/usr/bin" "$APPDIR/usr/lib"
-if [[ ! -x "$UPDATE_TOOL_DEST" ]]; then
-  echo "==> Baixando e extraindo appimageupdatetool..."
-  download_tool "$UPDATE_TOOL_URL" "$UPDATE_TOOL_AI"
-  EXTRACT_DIR="$ROOT/.appimageupdatetool-extract"
-  extract_appimage "$UPDATE_TOOL_AI" "$EXTRACT_DIR"
-  FOUND="$(find "$EXTRACT_DIR/squashfs-root" -type f -name 'appimageupdatetool' 2>/dev/null | head -1 || true)"
-  if [[ -n "$FOUND" && -f "$FOUND" ]]; then
-    cp -f "$FOUND" "$UPDATE_TOOL_DEST"
-    chmod +x "$UPDATE_TOOL_DEST"
-    # Libs do updater (não passar pelo linuxdeploy).
-    find "$EXTRACT_DIR/squashfs-root" -name 'libappimageupdate*.so*' -exec cp -a {} "$APPDIR/usr/lib/" \; || true
-  else
-    echo "Aviso: extraindo appimageupdatetool falhou; updates in-app podem não funcionar." >&2
-  fi
+echo "==> Baixando e extraindo appimageupdatetool..."
+download_tool "$UPDATE_TOOL_URL" "$UPDATE_TOOL_AI"
+EXTRACT_DIR="$ROOT/.appimageupdatetool-extract"
+extract_appimage "$UPDATE_TOOL_AI" "$EXTRACT_DIR"
+FOUND="$(find "$EXTRACT_DIR/squashfs-root" -type f -name 'appimageupdatetool' 2>/dev/null | head -1 || true)"
+if [[ -z "$FOUND" || ! -f "$FOUND" ]]; then
+  echo "Erro: appimageupdatetool não encontrado no AppImage do updater." >&2
   rm -rf "$EXTRACT_DIR"
+  exit 1
+fi
+cp -f "$FOUND" "$UPDATE_TOOL_DEST"
+chmod +x "$UPDATE_TOOL_DEST"
+find "$EXTRACT_DIR/squashfs-root" -name 'libappimageupdate*.so*' -exec cp -a {} "$APPDIR/usr/lib/" \; || true
+rm -rf "$EXTRACT_DIR"
+if [[ ! -x "$UPDATE_TOOL_DEST" ]]; then
+  echo "Erro: falha ao instalar appimageupdatetool em $UPDATE_TOOL_DEST." >&2
+  exit 1
 fi
 
 # libxcb-* empacotado + libxcb.so do sistema = SIGSEGV em dl_init.
@@ -253,8 +255,49 @@ if command -v patchelf >/dev/null 2>&1; then
     # sem --force-rpath => DT_RUNPATH
     patchelf --set-rpath '$ORIGIN/../lib' "$APPDIR/usr/bin/${BINARY}" || true
   fi
+  # Updater precisa achar libappimageupdate.so em ../lib.
+  if [[ -x "$APPDIR/usr/bin/appimageupdatetool" ]]; then
+    patchelf --set-rpath '$ORIGIN/../lib' "$APPDIR/usr/bin/appimageupdatetool" || true
+    find "$APPDIR/usr/lib" -name 'libappimageupdate*.so*' -type f \
+      -exec patchelf --set-rpath '$ORIGIN' {} \; 2>/dev/null || true
+  fi
 else
   echo "Aviso: patchelf ausente — RPATHs do linuxdeploy podem ficar agressivos." >&2
+fi
+
+if [[ ! -x "$APPDIR/usr/bin/appimageupdatetool" ]]; then
+  echo "Erro: appimageupdatetool ausente no AppDir." >&2
+  exit 1
+fi
+# Smoke: tool deve iniciar (exit 127 = lib/ELF quebrado).
+set +e
+"$APPDIR/usr/bin/appimageupdatetool" -h >/dev/null 2>&1 \
+  || "$APPDIR/usr/bin/appimageupdatetool" --help >/dev/null 2>&1 \
+  || "$APPDIR/usr/bin/appimageupdatetool" -V >/dev/null 2>&1
+TOOL_RC=$?
+set -e
+if [[ "$TOOL_RC" -eq 127 ]]; then
+  echo "Erro: appimageupdatetool não inicia (exit 127) — libs faltando?" >&2
+  exit 1
+fi
+echo "==> appimageupdatetool OK (smoke exit=$TOOL_RC)"
+
+# Catálogo i18n (en) precisa ir no AppImage para o seletor de idioma.
+if [[ ! -f "$APPDIR/usr/share/locale/en/LC_MESSAGES/webappstation.mo" ]]; then
+  echo "==> Copiando locale/en do build para o AppDir..."
+  mkdir -p "$APPDIR/usr/share/locale"
+  if [[ -d "$ROOT/build/locale/en" ]]; then
+    cp -a "$ROOT/build/locale/en" "$APPDIR/usr/share/locale/"
+  elif [[ -d "$ROOT/build-agent/locale/en" ]]; then
+    cp -a "$ROOT/build-agent/locale/en" "$APPDIR/usr/share/locale/"
+  else
+    echo "Erro: webappstation.mo (en) não encontrado para o AppImage." >&2
+    exit 1
+  fi
+fi
+if [[ ! -f "$APPDIR/usr/share/locale/en/LC_MESSAGES/webappstation.mo" ]]; then
+  echo "Erro: falha ao empacotar traduções em inglês." >&2
+  exit 1
 fi
 
 # linuxdeploy deixa AppRun -> usr/bin/webappstation; escrever sem rm
@@ -263,6 +306,7 @@ rm -f "$APPDIR/AppRun"
 cat > "$APPDIR/AppRun" << 'EOF'
 #!/bin/bash
 HERE="$(dirname "$(readlink -f "$0")")"
+export APPDIR="${APPDIR:-$HERE}"
 export PATH="${HERE}/usr/bin:${PATH}"
 # NÃO exportar LD_LIBRARY_PATH: o binário já tem RPATH ($ORIGIN/../lib) e
 # qt.conf. Forçar usr/lib no LD_LIBRARY_PATH mistura libs e causa SIGSEGV
@@ -271,6 +315,7 @@ export QT_PLUGIN_PATH="${HERE}/usr/plugins"
 export QML2_IMPORT_PATH="${HERE}/usr/qml:${HERE}/usr/lib/qml"
 export QML_IMPORT_PATH="$QML2_IMPORT_PATH"
 export XDG_DATA_DIRS="${HERE}/usr/share:/usr/share:/usr/local/share${XDG_DATA_DIRS:+:$XDG_DATA_DIRS}"
+export WEBAPPSTATION_LOCALE_DIR="${HERE}/usr/share/locale"
 unset QT_ROOT_PATH
 # Evitar que o host injete outro Qt via LD_LIBRARY_PATH do usuário.
 unset LD_LIBRARY_PATH

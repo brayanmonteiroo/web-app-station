@@ -8,10 +8,10 @@ TestCase {
 
     function test_placeholder_controls() {
         const label = Qt.createQmlObject(
-            'import QtQuick.Controls; Label { text: "Web Apps" }',
+            'import QtQuick.Controls; Label { text: "Aplicativos Web" }',
             this, "smokeLabel")
         verify(label !== null)
-        compare(label.text, "Web Apps")
+        compare(label.text, "Aplicativos Web")
         label.destroy()
     }
 

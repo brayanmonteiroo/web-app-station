@@ -10,6 +10,8 @@ add_library(webappstation-core STATIC
     ExecBuilder.h
     FaviconService.cpp
     FaviconService.h
+    LocaleService.cpp
+    LocaleService.h
     Paths.h
     ProfileService.cpp
     ProfileService.h

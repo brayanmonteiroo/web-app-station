@@ -1,14 +1,15 @@
 [Desktop Entry]
 Type=Application
-Name=Web App Station
-GenericName=Web Apps
+Name=Estação de Aplicativos Web
+Name[en]=Web App Station
+GenericName=Aplicativos Web
 GenericName[en]=Web Apps
 Comment=Execute sites como se fossem aplicativos
 Comment[en]=Run websites as if they were apps
 Exec=webappstation
 Icon=org.kde.webappstation
 Categories=Network;Utility;
-Keywords=webapp;navegador;ssb;browser;
+Keywords=webapp;navegador;ssb;browser;aplicativos;
 Keywords[en]=webapp;browser;ssb;
 Terminal=false
 StartupNotify=true
