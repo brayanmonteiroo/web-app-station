@@ -161,7 +161,17 @@ if [[ -z "$FOUND" || ! -f "$FOUND" ]]; then
 fi
 cp -f "$FOUND" "$UPDATE_TOOL_DEST"
 chmod +x "$UPDATE_TOOL_DEST"
-find "$EXTRACT_DIR/squashfs-root" -name 'libappimageupdate*.so*' -exec cp -a {} "$APPDIR/usr/lib/" \; || true
+# Libs do updater (OpenSSL 1.1, gpgme, …) em subpasta — não misturar com Qt6/OpenSSL3.
+UPDATE_LIB_DIR="$APPDIR/usr/lib/appimageupdate"
+rm -rf "$UPDATE_LIB_DIR"
+mkdir -p "$UPDATE_LIB_DIR"
+if [[ -d "$EXTRACT_DIR/squashfs-root/usr/lib" ]]; then
+  cp -a "$EXTRACT_DIR/squashfs-root/usr/lib/." "$UPDATE_LIB_DIR/"
+fi
+# Algumas builds usam multiarch.
+if [[ -d "$EXTRACT_DIR/squashfs-root/usr/lib/x86_64-linux-gnu" ]]; then
+  cp -a "$EXTRACT_DIR/squashfs-root/usr/lib/x86_64-linux-gnu/." "$UPDATE_LIB_DIR/"
+fi
 rm -rf "$EXTRACT_DIR"
 if [[ ! -x "$UPDATE_TOOL_DEST" ]]; then
   echo "Erro: falha ao instalar appimageupdatetool em $UPDATE_TOOL_DEST." >&2
@@ -255,11 +265,14 @@ if command -v patchelf >/dev/null 2>&1; then
     # sem --force-rpath => DT_RUNPATH
     patchelf --set-rpath '$ORIGIN/../lib' "$APPDIR/usr/bin/${BINARY}" || true
   fi
-  # Updater precisa achar libappimageupdate.so em ../lib.
+  # Updater: libs próprias em usr/lib/appimageupdate (OpenSSL 1.1 etc.).
   if [[ -x "$APPDIR/usr/bin/appimageupdatetool" ]]; then
-    patchelf --set-rpath '$ORIGIN/../lib' "$APPDIR/usr/bin/appimageupdatetool" || true
-    find "$APPDIR/usr/lib" -name 'libappimageupdate*.so*' -type f \
-      -exec patchelf --set-rpath '$ORIGIN' {} \; 2>/dev/null || true
+    patchelf --set-rpath '$ORIGIN/../lib/appimageupdate:$ORIGIN/../lib' \
+      "$APPDIR/usr/bin/appimageupdatetool" || true
+    if [[ -d "$APPDIR/usr/lib/appimageupdate" ]]; then
+      find "$APPDIR/usr/lib/appimageupdate" -name '*.so*' -type f \
+        -exec patchelf --set-rpath '$ORIGIN' {} \; 2>/dev/null || true
+    fi
   fi
 else
   echo "Aviso: patchelf ausente — RPATHs do linuxdeploy podem ficar agressivos." >&2

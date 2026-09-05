@@ -39,13 +39,24 @@ void prepareUpdaterEnvironment(QProcess &proc, const QString &tool)
     QProcessEnvironment env = QProcessEnvironment::systemEnvironment();
     const QFileInfo fi(tool);
     if (fi.isAbsolute()) {
-        const QString libDir =
+        const QString libRoot =
             QDir::cleanPath(fi.absolutePath() + QStringLiteral("/../lib"));
-        if (QDir(libDir).exists()) {
+        const QString updaterLib =
+            QDir(libRoot).filePath(QStringLiteral("appimageupdate"));
+        QStringList libDirs;
+        if (QDir(updaterLib).exists()) {
+            libDirs << updaterLib;
+        }
+        if (QDir(libRoot).exists()) {
+            libDirs << libRoot;
+        }
+        if (!libDirs.isEmpty()) {
             const QString existing = env.value(QStringLiteral("LD_LIBRARY_PATH"));
-            env.insert(QStringLiteral("LD_LIBRARY_PATH"),
-                       existing.isEmpty() ? libDir
-                                          : (libDir + QLatin1Char(':') + existing));
+            QString path = libDirs.join(QLatin1Char(':'));
+            if (!existing.isEmpty()) {
+                path += QLatin1Char(':') + existing;
+            }
+            env.insert(QStringLiteral("LD_LIBRARY_PATH"), path);
         }
     }
     proc.setProcessEnvironment(env);
