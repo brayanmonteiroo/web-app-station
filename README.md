@@ -13,6 +13,7 @@ O Web App Station cria atalhos no menu de aplicativos que abrem um site em janel
 - Parâmetros extras do navegador (ex.: `--start-maximized`)
 - Ícone do tema ou busca de favicon online
 - Categorias do menu (Web, Internet, Jogos, Escritório, etc.)
+- Interface em **português brasileiro** (idioma nativo); inglês via KI18n conforme o idioma do sistema
 - Distribuição via **AppImage**, com verificação de atualizações pela própria aplicação
 
 Os Web Apps ficam em `~/.local/share/applications/` como arquivos `.desktop`. Ícones e perfis ficam em `~/.local/share/web-app-station/`.
@@ -23,7 +24,7 @@ Os Web Apps ficam em `~/.local/share/applications/` como arquivos `.desktop`. Í
 - CMake 3.22+, Ninja, compilador C++20
 - Qt 6 e KDE Frameworks 6 (Kirigami, I18n, CoreAddons, Config, IconThemes)
 
-## Build no Fedora
+## Build (Fedora)
 
 ```bash
 sudo dnf install cmake ninja-build gcc-c++ extra-cmake-modules \
@@ -40,25 +41,27 @@ cmake --build build
 ./build/bin/webappstation
 ```
 
-## Build com Docker
+## Testes
 
-Útil se você não quiser instalar as libs de desenvolvimento no host:
+A suíte cobre a lógica das funcionalidades do front (lista, CRUD, editor, parâmetros, categorias, favicon, updates) com Qt Test + Qt Quick Test:
 
 ```bash
-git clone https://github.com/brayanmonteiroo/web-app-station.git
-cd web-app-station
-
-docker build -t webappstation-build .
-docker run --rm -v "$PWD":/src:z -w /src webappstation-build \
-  bash -lc 'cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release && cmake --build build'
-
-# Rodar (precisa de display no host):
-./build/bin/webappstation
+cmake -B build -G Ninja -DBUILD_TESTING=ON
+cmake --build build
+ctest --test-dir build --output-on-failure
 ```
+
+No Fedora, além das deps de build:
+
+```bash
+sudo dnf install qt6-qtbase-devel qt6-qtdeclarative-devel
+```
+
+(`Qt6::Test` e `Qt6::QuickTest` vêm nesses pacotes.)
 
 ## AppImage
 
-Gera o AppImage e o arquivo `.zsync` usados nas releases:
+Gera o AppImage e o arquivo `.zsync` usados nas releases (também exige as deps de build acima):
 
 ```bash
 chmod +x packaging/appimage/build.sh

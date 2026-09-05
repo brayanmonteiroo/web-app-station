@@ -12,6 +12,7 @@
 class WebAppListModel : public QAbstractListModel
 {
     Q_OBJECT
+    Q_PROPERTY(int count READ count NOTIFY countChanged)
 public:
     enum Roles {
         NameRole = Qt::UserRole + 1,
@@ -37,6 +38,10 @@ public:
 
     Q_INVOKABLE void reload();
     [[nodiscard]] WebApp at(int row) const;
+    [[nodiscard]] int count() const { return m_apps.size(); }
+
+Q_SIGNALS:
+    void countChanged();
 
 private:
     WebAppManager *m_manager = nullptr;
@@ -49,6 +54,7 @@ class AppController : public QObject
     Q_PROPERTY(WebAppListModel *webApps READ webApps CONSTANT)
     Q_PROPERTY(FaviconService *faviconService READ faviconService CONSTANT)
     Q_PROPERTY(UpdateService *updateService READ updateService CONSTANT)
+    Q_PROPERTY(QString version READ version CONSTANT)
     Q_PROPERTY(QVariantList browsers READ browsers NOTIFY browsersChanged)
     Q_PROPERTY(QVariantList categories READ categories CONSTANT)
     Q_PROPERTY(bool hasBrowsers READ hasBrowsers NOTIFY browsersChanged)
@@ -60,6 +66,10 @@ public:
     WebAppListModel *webApps() const { return m_model; }
     FaviconService *faviconService() const { return m_favicon; }
     UpdateService *updateService() const { return m_update; }
+    QString version() const
+    {
+        return QStringLiteral(WEBAPPSTATION_VERSION);
+    }
     QVariantList browsers() const { return m_browsers; }
     QVariantList categories() const;
     bool hasBrowsers() const { return !m_browsers.isEmpty(); }

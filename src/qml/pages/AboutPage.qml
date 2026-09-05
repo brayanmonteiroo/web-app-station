@@ -5,11 +5,11 @@ import QtQuick.Layouts
 import org.kde.kirigami as Kirigami
 
 Kirigami.ScrollablePage {
-    title: i18n("About")
+    title: i18n("Sobre")
 
     actions: [
         Kirigami.Action {
-            text: i18n("Back")
+            text: i18n("Voltar")
             icon.name: "go-previous"
             onTriggered: pageStack.pop()
         }
@@ -34,14 +34,14 @@ Kirigami.ScrollablePage {
         }
 
         Controls.Label {
-            text: i18n("Run websites as if they were apps")
+            text: i18n("Execute sites como se fossem aplicativos")
             wrapMode: Text.WordWrap
             horizontalAlignment: Text.AlignHCenter
             Layout.fillWidth: true
         }
 
         Controls.Label {
-            text: "0.1.0"
+            text: App.version
             horizontalAlignment: Text.AlignHCenter
             Layout.fillWidth: true
             opacity: 0.7

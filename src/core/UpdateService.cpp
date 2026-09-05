@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 #include "UpdateService.h"
 
+#include <KLocalizedString>
+
 #include <QCoreApplication>
 #include <QDir>
 #include <QFile>
@@ -110,14 +112,14 @@ void UpdateService::checkAndApply(bool manual)
     if (!isAppImage() || updatesDisabled() || m_busy) {
         if (manual && !isAppImage()) {
             Q_EMIT updateFailed(
-                QStringLiteral("Atualizações só funcionam no AppImage."));
+                i18n("Atualizações só funcionam no AppImage."));
         }
         return;
     }
 
     setBusy(true);
     if (manual) {
-        Q_EMIT updateMessage(QStringLiteral("Verificando atualizações..."));
+        Q_EMIT updateMessage(i18n("Verificando atualizações..."));
     }
 
     const QString path = appImagePath();
@@ -136,6 +138,17 @@ void UpdateService::checkAndApply(bool manual)
                 }
                 if (result.startsWith(QStringLiteral("updated:"))) {
                     Q_EMIT updateApplied(result.mid(8));
+                    return;
+                }
+                if (result == QStringLiteral("err_start_updater")) {
+                    Q_EMIT updateFailed(
+                        i18n("Não foi possível iniciar o atualizador."));
+                    return;
+                }
+                if (result == QStringLiteral("err_no_tool")) {
+                    Q_EMIT updateFailed(i18n(
+                        "Ferramenta de atualização (appimageupdatetool) não "
+                        "encontrada. Baixe a nova release em GitHub."));
                     return;
                 }
                 Q_EMIT updateFailed(result);
@@ -175,7 +188,7 @@ void UpdateService::checkAndApply(bool manual)
             QProcess apply;
             apply.start(tool, {QStringLiteral("-O"), path});
             if (!apply.waitForStarted(3000)) {
-                return QStringLiteral("Não foi possível iniciar o atualizador.");
+                return QStringLiteral("err_start_updater");
             }
             apply.waitForFinished(-1);
             if (apply.exitCode() != 0) {
@@ -184,9 +197,7 @@ void UpdateService::checkAndApply(bool manual)
             return QStringLiteral("updated:") + path;
         }
 
-        return QStringLiteral(
-            "Ferramenta de atualização (appimageupdatetool) não encontrada. "
-            "Baixe a nova release em GitHub.");
+        return QStringLiteral("err_no_tool");
     }));
 }
 
@@ -198,7 +209,7 @@ void UpdateService::restart()
     }
     if (!QProcess::startDetached(path, {})) {
         Q_EMIT updateFailed(
-            QStringLiteral("Não foi possível reiniciar o Web App Station."));
+            i18n("Não foi possível reiniciar o Web App Station."));
         return;
     }
     QCoreApplication::quit();

@@ -2,7 +2,7 @@
 #include "AppController.h"
 
 #include <KAboutData>
-#include <KLocalizedContext>
+#include <KLocalizedQmlContext>
 #include <KLocalizedString>
 
 #include <QApplication>
@@ -19,11 +19,11 @@ int main(int argc, char *argv[])
     KAboutData about(
         QStringLiteral("webappstation"),
         i18n("Web App Station"),
-        QStringLiteral("0.1.0"),
-        i18n("Run websites as if they were apps"),
+        QStringLiteral(WEBAPPSTATION_VERSION),
+        i18n("Execute sites como se fossem aplicativos"),
         KAboutLicense::MIT,
         i18n("© 2026 Brayan Monteiro"));
-    about.addAuthor(i18n("Brayan Monteiro"), QString(),
+    about.addAuthor(QStringLiteral("Brayan Monteiro"), QString(),
                     QStringLiteral("https://github.com/brayanmonteiroo"));
     about.setHomepage(
         QStringLiteral("https://github.com/brayanmonteiroo/web-app-station"));
@@ -36,7 +36,7 @@ int main(int argc, char *argv[])
 
     QQmlApplicationEngine engine;
     auto *controller = new AppController(&app);
-    engine.rootContext()->setContextObject(new KLocalizedContext(&engine));
+    KLocalization::setupLocalizedContext(&engine);
     engine.rootContext()->setContextProperty(QStringLiteral("App"), controller);
 
     engine.loadFromModule("org.kde.webappstation", "Main");

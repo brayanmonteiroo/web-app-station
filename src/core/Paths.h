@@ -24,6 +24,24 @@ inline QString iconsDir()
     return iceRoot() + QStringLiteral("/icons");
 }
 
+/** Ícone no tema hicolor (nome de tema livre, ex. WebApp-X ou chrome-host__-Default). */
+inline QString hicolorIconPath(const QString &themeName)
+{
+    return QStandardPaths::writableLocation(QStandardPaths::GenericDataLocation)
+        + QStringLiteral("/icons/hicolor/256x256/apps/%1.png").arg(themeName);
+}
+
+inline QString windowIconThemeName(const QString &codename)
+{
+    return QStringLiteral("WebApp-%1").arg(codename);
+}
+
+/** Ícone WebApp-{codename}.png (Firefox / fallback). */
+inline QString hicolorAppIconPath(const QString &codename)
+{
+    return hicolorIconPath(windowIconThemeName(codename));
+}
+
 inline QString chromiumProfilesDir()
 {
     return iceRoot() + QStringLiteral("/profiles");

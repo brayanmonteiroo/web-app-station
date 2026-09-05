@@ -1,0 +1,222 @@
+# English translation for Web App Station.
+# Source strings are Brazilian Portuguese (pt_BR).
+msgid ""
+msgstr ""
+"Project-Id-Version: webappstation 0.1.0\n"
+"Report-Msgid-Bugs-To: https://github.com/brayanmonteiroo/web-app-station/issues\n"
+"POT-Creation-Date: 2026-04-05 12:00+0000\n"
+"PO-Revision-Date: 2026-04-05 12:00+0000\n"
+"Last-Translator: Web App Station\n"
+"Language-Team: English\n"
+"Language: en\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+
+msgid "Web Apps"
+msgstr "Web Apps"
+
+msgid "Web App Station"
+msgstr "Web App Station"
+
+msgid "Atalhos de teclado"
+msgstr "Keyboard Shortcuts"
+
+msgid "Sobre"
+msgstr "About"
+
+msgid "Sair"
+msgstr "Quit"
+
+msgid "Já está na versão mais recente."
+msgstr "Already up to date."
+
+msgid "Verificar atualizações?"
+msgstr "Check for updates?"
+
+msgid "Deseja que o Web App Station verifique atualizações automaticamente quando aberto pelo AppImage?"
+msgstr "Should Web App Station automatically check for updates when launched from the AppImage?"
+
+msgid "Atualização instalada"
+msgstr "Update installed"
+
+msgid "A atualização foi aplicada. Reiniciar agora?"
+msgstr "The update was applied. Restart now?"
+
+msgid "Reiniciar agora"
+msgstr "Restart now"
+
+msgid "Depois"
+msgstr "Later"
+
+msgid "Adicionar"
+msgstr "Add"
+
+msgid "Adicionar um novo Web App"
+msgstr "Add a new Web App"
+
+msgid "Nenhum navegador suportado foi detectado."
+msgstr "No supported browsers were detected."
+
+msgid "Editar"
+msgstr "Edit"
+
+msgid "Remover"
+msgstr "Remove"
+
+msgid "Abrir"
+msgstr "Launch"
+
+msgid "Verificar atualizações"
+msgstr "Check for updates"
+
+msgid "Nenhum Web App ainda"
+msgstr "No Web Apps yet"
+
+msgid "Execute sites como se fossem aplicativos"
+msgstr "Run websites as if they were apps"
+
+msgid "Excluir '%1'"
+msgstr "Delete '%1'"
+
+msgid "Tem certeza de que deseja excluir '%1'?"
+msgstr "Are you sure you want to delete '%1'?"
+
+msgid "Este Web App será perdido permanentemente."
+msgstr "This Web App will be permanently lost."
+
+msgid "Editar Web App"
+msgstr "Edit Web App"
+
+msgid "Adicionar Web App"
+msgstr "Add a New Web App"
+
+msgid "Salvar"
+msgstr "Save"
+
+msgid "Cancelar"
+msgstr "Cancel"
+
+msgid "Nome"
+msgstr "Name"
+
+msgid "Nome do site"
+msgstr "Website name"
+
+msgid "Descrição"
+msgstr "Description"
+
+msgid "Web App"
+msgstr "Web App"
+
+msgid "Endereço"
+msgstr "Address"
+
+msgid "Ícone"
+msgstr "Icon"
+
+msgid "Buscar ícones online"
+msgstr "Find icons online"
+
+msgid "Categoria"
+msgstr "Category"
+
+msgid "Navegador"
+msgstr "Browser"
+
+msgid "Perfil isolado"
+msgstr "Isolated profile"
+
+msgid "Se ativado, o site roda com um perfil próprio do navegador."
+msgstr "If enabled, the website runs with its own browser profile."
+
+msgid "Se ativado, o site roda com um perfil próprio do navegador. No Chrome/Brave o perfil dedicado também é usado para o ícone correto na barra de tarefas (Wayland)."
+msgstr "If enabled, the website runs with its own browser profile. On Chrome/Brave a dedicated profile is also required for the correct taskbar icon on Wayland."
+
+msgid "Se ativado, o site roda com um perfil próprio (login separado do browser). Se desativado no Chrome/Brave, usa a mesma sessão — você já entra logado quando estiver logado no navegador."
+msgstr "If enabled, the site uses its own profile (separate login). If disabled on Chrome/Brave, it shares the browser session — you stay logged in when already logged into the browser."
+
+msgid "Barra de navegação"
+msgstr "Navigation bar"
+
+msgid "Mostra a barra de navegação do Firefox neste Web App."
+msgstr "Shows the Firefox navigation bar in this Web App."
+
+msgid "Janela privada / anônima"
+msgstr "Private / Incognito Window"
+
+msgid "Parâmetros extras"
+msgstr "Custom parameters"
+
+msgid "Ex.: --start-maximized"
+msgstr "e.g. --start-maximized"
+
+msgid "Voltar"
+msgstr "Back"
+
+msgid "Escolher um ícone"
+msgstr "Choose an icon"
+
+msgid "Nenhum ícone encontrado"
+msgstr "No icons found"
+
+msgid "Web"
+msgstr "Web"
+
+msgid "Internet"
+msgstr "Internet"
+
+msgid "Atalhos comuns (Chromium / Brave / Chrome):"
+msgstr "Common shortcuts (Chromium / Brave / Chrome):"
+
+msgid "Maximizado"
+msgstr "Maximized"
+
+msgid "Tela cheia"
+msgstr "Fullscreen"
+
+msgid "Nova janela"
+msgstr "New window"
+
+msgid "Sem extensões"
+msgstr "No extensions"
+
+msgid "Acessórios"
+msgstr "Accessories"
+
+msgid "Jogos"
+msgstr "Games"
+
+msgid "Gráficos"
+msgstr "Graphics"
+
+msgid "Escritório"
+msgstr "Office"
+
+msgid "Som e vídeo"
+msgstr "Sound & Video"
+
+msgid "Programação"
+msgstr "Programming"
+
+msgid "Educação"
+msgstr "Education"
+
+msgid "Atualizações só funcionam no AppImage."
+msgstr "Updates only work in the AppImage."
+
+msgid "Verificando atualizações..."
+msgstr "Checking for updates..."
+
+msgid "Não foi possível iniciar o atualizador."
+msgstr "Could not start the updater."
+
+msgid "Ferramenta de atualização (appimageupdatetool) não encontrada. Baixe a nova release em GitHub."
+msgstr "Update tool (appimageupdatetool) not found. Download the new release from GitHub."
+
+msgid "Não foi possível reiniciar o Web App Station."
+msgstr "Could not restart Web App Station."
+
+msgid "© 2026 Brayan Monteiro"
+msgstr "© 2026 Brayan Monteiro"

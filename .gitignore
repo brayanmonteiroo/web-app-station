@@ -1,9 +1,11 @@
 /build/
 /AppDir/
 /cmake-build-*/
+/build.root.old/
 *.AppImage
 *.AppImage.zsync
 appimagetool
+appimageupdatetool-x86_64.AppImage
 linuxdeploy*
 .cache/
 *.user

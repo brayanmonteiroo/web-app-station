@@ -6,7 +6,7 @@ import org.kde.kirigami as Kirigami
 
 Kirigami.ScrollablePage {
     id: page
-    title: i18n("Choose an icon")
+    title: i18n("Escolher um ícone")
     property var onIconChosen
 
     property var icons: []
@@ -20,7 +20,7 @@ Kirigami.ScrollablePage {
 
     actions: [
         Kirigami.Action {
-            text: i18n("Cancel")
+            text: i18n("Cancelar")
             icon.name: "dialog-cancel"
             onTriggered: pageStack.pop()
         }
@@ -35,7 +35,7 @@ Kirigami.ScrollablePage {
     Kirigami.PlaceholderMessage {
         anchors.centerIn: parent
         visible: !App.faviconService.busy && icons.length === 0
-        text: i18n("No icons found")
+        text: i18n("Nenhum ícone encontrado")
     }
 
     Flow {

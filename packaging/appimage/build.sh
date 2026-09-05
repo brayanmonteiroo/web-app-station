@@ -62,13 +62,30 @@ download_tool \
   "https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage" \
   "$APPIMAGETOOL"
 
-# Optional AppImageUpdate tool for in-app updates
+# Optional AppImageUpdate tool for in-app updates (ELF real, não AppImage aninhado).
 UPDATE_TOOL_URL="https://github.com/AppImageCommunity/AppImageUpdate/releases/download/continuous/appimageupdatetool-x86_64.AppImage"
+UPDATE_TOOL_AI="$ROOT/appimageupdatetool-x86_64.AppImage"
 UPDATE_TOOL_DEST="$APPDIR/usr/bin/appimageupdatetool"
-if [[ ! -f "$UPDATE_TOOL_DEST" ]]; then
-  echo "==> Baixando appimageupdatetool..."
-  curl -sSL "$UPDATE_TOOL_URL" -o "$UPDATE_TOOL_DEST" || true
-  chmod +x "$UPDATE_TOOL_DEST" 2>/dev/null || true
+mkdir -p "$APPDIR/usr/bin"
+if [[ ! -x "$UPDATE_TOOL_DEST" ]]; then
+  echo "==> Baixando e extraindo appimageupdatetool..."
+  download_tool "$UPDATE_TOOL_URL" "$UPDATE_TOOL_AI"
+  EXTRACT_DIR="$ROOT/.appimageupdatetool-extract"
+  rm -rf "$EXTRACT_DIR"
+  mkdir -p "$EXTRACT_DIR"
+  (
+    cd "$EXTRACT_DIR"
+    "$UPDATE_TOOL_AI" --appimage-extract >/dev/null
+  )
+  # Preferir binário ELF dentro do squashfs
+  FOUND="$(find "$EXTRACT_DIR/squashfs-root" -type f -name 'appimageupdatetool' 2>/dev/null | head -1 || true)"
+  if [[ -n "$FOUND" && -f "$FOUND" ]]; then
+    cp -f "$FOUND" "$UPDATE_TOOL_DEST"
+    chmod +x "$UPDATE_TOOL_DEST"
+  else
+    echo "Aviso: extraindo appimageupdatetool falhou; updates in-app podem não funcionar." >&2
+  fi
+  rm -rf "$EXTRACT_DIR"
 fi
 
 echo "==> Empacotando dependências Qt/KF com linuxdeploy..."

@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 #include "AppController.h"
 
+#include <KLocalizedString>
+
 WebAppListModel::WebAppListModel(WebAppManager *manager, QObject *parent)
     : QAbstractListModel(parent)
     , m_manager(manager)
@@ -78,6 +80,7 @@ void WebAppListModel::reload()
     beginResetModel();
     m_apps = m_manager->webApps();
     endResetModel();
+    Q_EMIT countChanged();
 }
 
 WebApp WebAppListModel::at(int row) const
@@ -99,25 +102,25 @@ AppController::AppController(QObject *parent)
 
 QVariantList AppController::categories() const
 {
+    // IDs = Main Categories do freedesktop (evita "Achados e perdidos" no KDE).
+    // Textos-fonte em pt_BR; inglês via po/en (KI18n).
     return {
-        QVariantMap{{QStringLiteral("id"), QStringLiteral("WebApps")},
-                    {QStringLiteral("name"), QStringLiteral("Web")}},
         QVariantMap{{QStringLiteral("id"), QStringLiteral("Network")},
-                    {QStringLiteral("name"), QStringLiteral("Internet")}},
+                    {QStringLiteral("name"), i18n("Internet")}},
         QVariantMap{{QStringLiteral("id"), QStringLiteral("Utility")},
-                    {QStringLiteral("name"), QStringLiteral("Accessories")}},
+                    {QStringLiteral("name"), i18n("Acessórios")}},
         QVariantMap{{QStringLiteral("id"), QStringLiteral("Game")},
-                    {QStringLiteral("name"), QStringLiteral("Games")}},
+                    {QStringLiteral("name"), i18n("Jogos")}},
         QVariantMap{{QStringLiteral("id"), QStringLiteral("Graphics")},
-                    {QStringLiteral("name"), QStringLiteral("Graphics")}},
+                    {QStringLiteral("name"), i18n("Gráficos")}},
         QVariantMap{{QStringLiteral("id"), QStringLiteral("Office")},
-                    {QStringLiteral("name"), QStringLiteral("Office")}},
+                    {QStringLiteral("name"), i18n("Escritório")}},
         QVariantMap{{QStringLiteral("id"), QStringLiteral("AudioVideo")},
-                    {QStringLiteral("name"), QStringLiteral("Sound & Video")}},
+                    {QStringLiteral("name"), i18n("Som e vídeo")}},
         QVariantMap{{QStringLiteral("id"), QStringLiteral("Development")},
-                    {QStringLiteral("name"), QStringLiteral("Programming")}},
+                    {QStringLiteral("name"), i18n("Programação")}},
         QVariantMap{{QStringLiteral("id"), QStringLiteral("Education")},
-                    {QStringLiteral("name"), QStringLiteral("Education")}},
+                    {QStringLiteral("name"), i18n("Educação")}},
     };
 }
 

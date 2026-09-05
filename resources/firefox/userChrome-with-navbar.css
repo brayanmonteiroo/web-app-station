@@ -1,3 +1,5 @@
+/* Com "barra de navegação" ligada: mostra chrome útil, moldura nativa
+ * continua via browser.tabs.inTitlebar=0. */
 #nav-bar,
 #TabsToolbar,
 #PersonalToolbar {

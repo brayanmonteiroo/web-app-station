@@ -49,11 +49,11 @@ QString FaviconService::guessThemeIcon(const QString &url) const
         return {};
     }
 
-    if (domain == QStringLiteral("google")
-        && host.contains(QStringLiteral("mail"))) {
-        return QStringLiteral("web-google-gmail");
-    }
-    if (domain == QStringLiteral("gmail")) {
+    if ((domain == QStringLiteral("google")
+         && host.contains(QStringLiteral("mail")))
+        || (domain == QStringLiteral("mail")
+            && host.contains(QStringLiteral("google")))
+        || domain == QStringLiteral("gmail")) {
         return QStringLiteral("web-google-gmail");
     }
     if (domain == QStringLiteral("youtube")) {
@@ -81,6 +81,9 @@ QString FaviconService::persistIcon(const QString &tempPath,
     if (!QFile::copy(tempPath, dest)) {
         return tempPath;
     }
+    QFile::setPermissions(dest,
+                          QFileDevice::ReadOwner | QFileDevice::WriteOwner
+                              | QFileDevice::ReadGroup | QFileDevice::ReadOther);
     return dest;
 }
 

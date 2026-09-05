@@ -7,12 +7,15 @@ import org.kde.kirigami as Kirigami
 Kirigami.ApplicationWindow {
     id: root
     title: i18n("Web Apps")
-    minimumWidth: Kirigami.Units.gridUnit * 30
-    minimumHeight: Kirigami.Units.gridUnit * 22
-    width: Kirigami.Units.gridUnit * 42
-    height: Kirigami.Units.gridUnit * 30
+    minimumWidth: Kirigami.Units.gridUnit * 28
+    minimumHeight: Kirigami.Units.gridUnit * 24
+    width: Kirigami.Units.gridUnit * 46
+    height: Kirigami.Units.gridUnit * 34
 
-    pageStack.initialPage: Qt.resolvedUrl("pages/WebAppListPage.qml")
+    // Evita coluna estreita ao lado da lista (formulário cortado)
+    pageStack.columnView.columnResizeMode: Kirigami.ColumnView.SingleColumn
+
+    pageStack.initialPage: WebAppListPage {}
 
     globalDrawer: Kirigami.GlobalDrawer {
         title: i18n("Web App Station")
@@ -20,19 +23,19 @@ Kirigami.ApplicationWindow {
         isMenu: true
         actions: [
             Kirigami.Action {
-                text: i18n("Keyboard Shortcuts")
+                text: i18n("Atalhos de teclado")
                 icon.name: "configure-shortcuts"
                 shortcut: "Ctrl+K"
-                onTriggered: root.pageStack.push(Qt.resolvedUrl("pages/ShortcutsPage.qml"))
+                onTriggered: root.pageStack.push(Qt.createComponent("org.kde.webappstation", "ShortcutsPage"))
             },
             Kirigami.Action {
-                text: i18n("About")
+                text: i18n("Sobre")
                 icon.name: "help-about"
                 shortcut: "F1"
-                onTriggered: root.pageStack.push(Qt.resolvedUrl("pages/AboutPage.qml"))
+                onTriggered: root.pageStack.push(Qt.createComponent("org.kde.webappstation", "AboutPage"))
             },
             Kirigami.Action {
-                text: i18n("Quit")
+                text: i18n("Sair")
                 icon.name: "application-exit"
                 shortcut: "Ctrl+Q"
                 onTriggered: Qt.quit()
@@ -85,6 +88,7 @@ Kirigami.ApplicationWindow {
         contentItem: Controls.Label {
             text: i18n("Deseja que o Web App Station verifique atualizações automaticamente quando aberto pelo AppImage?")
             wrapMode: Text.WordWrap
+            width: Kirigami.Units.gridUnit * 24
         }
         onAccepted: {
             App.updateService.savePref(true)
@@ -99,10 +103,10 @@ Kirigami.ApplicationWindow {
         title: i18n("Atualização instalada")
         modal: true
         anchors.centerIn: parent
-        standardButtons: Controls.Dialog.Ok
         contentItem: Controls.Label {
             text: i18n("A atualização foi aplicada. Reiniciar agora?")
             wrapMode: Text.WordWrap
+            width: Kirigami.Units.gridUnit * 24
         }
         footer: Controls.DialogButtonBox {
             Controls.Button {

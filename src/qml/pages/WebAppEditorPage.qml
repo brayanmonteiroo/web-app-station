@@ -3,13 +3,14 @@ import QtQuick
 import QtQuick.Controls as Controls
 import QtQuick.Layouts
 import org.kde.kirigami as Kirigami
+import "ParamUtils.js" as ParamUtils
 
 Kirigami.ScrollablePage {
     id: page
     property bool editMode: false
     property int editIndex: -1
 
-    title: editMode ? i18n("Edit Web App") : i18n("Add a New Web App")
+    title: editMode ? i18n("Editar Web App") : i18n("Adicionar Web App")
 
     property string selectedIcon: "org.kde.webappstation"
     property int browserIndex: 0
@@ -44,8 +45,8 @@ Kirigami.ScrollablePage {
             return
         }
         const b = App.browsers[Math.min(browserIndex, App.browsers.length - 1)]
-        isolateRow.visible = !!b.supportsIsolation
-        navbarRow.visible = !!b.supportsNavbar
+        isolateSection.visible = !!b.supportsIsolation
+        navbarSection.visible = !!b.supportsNavbar
     }
 
     function save() {
@@ -70,37 +71,51 @@ Kirigami.ScrollablePage {
 
     actions: [
         Kirigami.Action {
-            text: i18n("OK")
+            text: i18n("Salvar")
             icon.name: "dialog-ok"
             enabled: nameField.text.trim().length > 0 && urlField.text.trim().length > 0
             onTriggered: page.save()
         },
         Kirigami.Action {
-            text: i18n("Cancel")
+            text: i18n("Cancelar")
             icon.name: "dialog-cancel"
             onTriggered: pageStack.pop()
         }
     ]
 
-    Kirigami.FormLayout {
-        wideMode: true
+    ColumnLayout {
+        width: Math.min(page.width - page.leftPadding - page.rightPadding,
+                        Kirigami.Units.gridUnit * 36)
+        spacing: Kirigami.Units.largeSpacing
 
+        Controls.Label {
+            text: i18n("Nome")
+            font.bold: true
+        }
         Controls.TextField {
             id: nameField
-            Kirigami.FormData.label: i18n("Name:")
-            placeholderText: i18n("Website name")
+            Layout.fillWidth: true
+            placeholderText: i18n("Nome do site")
         }
 
+        Controls.Label {
+            text: i18n("Descrição")
+            font.bold: true
+        }
         Controls.TextField {
             id: descField
-            Kirigami.FormData.label: i18n("Description:")
+            Layout.fillWidth: true
             placeholderText: i18n("Web App")
         }
 
+        Controls.Label {
+            text: i18n("Endereço")
+            font.bold: true
+        }
         Controls.TextField {
             id: urlField
-            Kirigami.FormData.label: i18n("Address:")
-            placeholderText: "https://www.website.com"
+            Layout.fillWidth: true
+            placeholderText: "https://www.exemplo.com"
             onTextChanged: {
                 const guess = App.faviconService.guessThemeIcon(App.normalizeUrl(text))
                 if (guess.length > 0 && !editMode) {
@@ -109,19 +124,25 @@ Kirigami.ScrollablePage {
             }
         }
 
+        Controls.Label {
+            text: i18n("Ícone")
+            font.bold: true
+        }
         RowLayout {
-            Kirigami.FormData.label: i18n("Icon:")
+            Layout.fillWidth: true
+            spacing: Kirigami.Units.largeSpacing
             Kirigami.Icon {
                 source: selectedIcon
                 Layout.preferredWidth: Kirigami.Units.iconSizes.large
                 Layout.preferredHeight: Kirigami.Units.iconSizes.large
             }
             Controls.Button {
-                text: i18n("Find icons online")
+                text: i18n("Buscar ícones online")
+                Layout.fillWidth: true
                 enabled: urlField.text.trim().length > 0 && !App.faviconService.busy
                 onClicked: {
                     App.faviconService.findIcons(App.normalizeUrl(urlField.text))
-                    pageStack.push(Qt.resolvedUrl("FaviconPage.qml"))
+                    pageStack.push(Qt.createComponent("org.kde.webappstation", "FaviconPage"))
                 }
             }
         }
@@ -133,18 +154,27 @@ Kirigami.ScrollablePage {
             }
         }
 
+        Controls.Label {
+            text: i18n("Categoria")
+            font.bold: true
+        }
         Controls.ComboBox {
             id: categoryCombo
-            Kirigami.FormData.label: i18n("Category:")
+            Layout.fillWidth: true
             model: App.categories
             textRole: "name"
             currentIndex: categoryIndex
             onCurrentIndexChanged: categoryIndex = currentIndex
         }
 
+        Controls.Label {
+            text: i18n("Navegador")
+            font.bold: true
+            visible: !editMode && App.browsers.length > 1
+        }
         Controls.ComboBox {
             id: browserCombo
-            Kirigami.FormData.label: i18n("Browser:")
+            Layout.fillWidth: true
             visible: !editMode && App.browsers.length > 1
             model: App.browsers
             textRole: "name"
@@ -155,40 +185,109 @@ Kirigami.ScrollablePage {
             }
         }
 
-        RowLayout {
-            id: isolateRow
-            Kirigami.FormData.label: i18n("Isolated profile:")
-            Controls.Switch {
-                id: isolateSwitch
+        ColumnLayout {
+            id: isolateSection
+            Layout.fillWidth: true
+            spacing: Kirigami.Units.smallSpacing
+            RowLayout {
+                Layout.fillWidth: true
+                Controls.Label {
+                    text: i18n("Perfil isolado")
+                    Layout.fillWidth: true
+                }
+                Controls.Switch {
+                    id: isolateSwitch
+                }
             }
             Controls.Label {
-                text: i18n("If this option is enabled the website will run with its own browser profile.")
-                wrapMode: Text.WordWrap
                 Layout.fillWidth: true
-                opacity: 0.8
+                text: i18n("Se ativado, o site roda com um perfil próprio (login separado do browser). Se desativado no Chrome/Brave, usa a mesma sessão — você já entra logado quando estiver logado no navegador.")
+                wrapMode: Text.WordWrap
+                opacity: 0.75
+                font: Kirigami.Theme.smallFont
             }
         }
 
-        RowLayout {
-            id: navbarRow
+        ColumnLayout {
+            id: navbarSection
             visible: false
-            Kirigami.FormData.label: i18n("Navigation bar:")
-            Controls.Switch {
-                id: navbarSwitch
+            Layout.fillWidth: true
+            spacing: Kirigami.Units.smallSpacing
+            RowLayout {
+                Layout.fillWidth: true
+                Controls.Label {
+                    text: i18n("Barra de navegação")
+                    Layout.fillWidth: true
+                }
+                Controls.Switch {
+                    id: navbarSwitch
+                }
+            }
+            Controls.Label {
+                Layout.fillWidth: true
+                text: i18n("Mostra a barra de navegação do Firefox neste Web App.")
+                wrapMode: Text.WordWrap
+                opacity: 0.75
+                font: Kirigami.Theme.smallFont
             }
         }
 
-        RowLayout {
-            Kirigami.FormData.label: i18n("Private/Incognito Window:")
-            Controls.Switch {
-                id: privateSwitch
+        ColumnLayout {
+            Layout.fillWidth: true
+            spacing: Kirigami.Units.smallSpacing
+            RowLayout {
+                Layout.fillWidth: true
+                Controls.Label {
+                    text: i18n("Janela privada / anônima")
+                    Layout.fillWidth: true
+                    wrapMode: Text.WordWrap
+                }
+                Controls.Switch {
+                    id: privateSwitch
+                }
             }
         }
 
+        Controls.Label {
+            text: i18n("Parâmetros extras")
+            font.bold: true
+        }
         Controls.TextField {
             id: customField
-            Kirigami.FormData.label: i18n("Custom parameters:")
-            placeholderText: i18n("Custom browser parameters")
+            Layout.fillWidth: true
+            placeholderText: i18n("Ex.: --start-maximized")
+        }
+        Controls.Label {
+            Layout.fillWidth: true
+            text: i18n("Atalhos comuns (Chromium / Brave / Chrome):")
+            wrapMode: Text.WordWrap
+            opacity: 0.75
+            font: Kirigami.Theme.smallFont
+        }
+        Flow {
+            Layout.fillWidth: true
+            spacing: Kirigami.Units.smallSpacing
+
+            Repeater {
+                model: [
+                    { label: i18n("Maximizado"), flag: "--start-maximized" },
+                    { label: i18n("Tela cheia"), flag: "--start-fullscreen" },
+                    { label: i18n("Nova janela"), flag: "--new-window" },
+                    { label: i18n("Sem extensões"), flag: "--disable-extensions" }
+                ]
+                delegate: Controls.Button {
+                    text: modelData.label
+                    checkable: true
+                    checked: ParamUtils.hasFlag(customField.text, modelData.flag)
+                    onClicked: customField.text = ParamUtils.toggle(customField.text, modelData.flag)
+                }
+            }
+        }
+
+        // Espaço extra para o scroll não colar no fim
+        Item {
+            Layout.fillWidth: true
+            Layout.preferredHeight: Kirigami.Units.gridUnit
         }
     }
 }
