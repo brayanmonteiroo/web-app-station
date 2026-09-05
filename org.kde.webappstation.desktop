@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Web App Station
+GenericName=Web Apps
+Comment=Run websites as if they were apps
+Exec=webappstation
+Icon=org.kde.webappstation
+Categories=Network;Utility;
+Keywords=webapp;browser;ssb;
+Terminal=false
+StartupNotify=true

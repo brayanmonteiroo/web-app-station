@@ -1,0 +1,13 @@
+/build/
+/AppDir/
+/cmake-build-*/
+*.AppImage
+*.AppImage.zsync
+appimagetool
+linuxdeploy*
+.cache/
+*.user
+*.autosave
+.idea/
+.vscode/
+compile_commands.json
