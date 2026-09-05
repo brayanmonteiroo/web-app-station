@@ -33,7 +33,10 @@ private Q_SLOTS:
 
     void english_translates_core_ui_strings()
     {
-        KLocalizedString::setLanguages({QStringLiteral("en")});
+        // Preferência como o app real: env + setLanguages via finishI18nSetup.
+        LocaleService locale;
+        locale.setLanguage(QStringLiteral("en"));
+        LocaleService::finishI18nSetup();
         QCOMPARE(i18n("Adicionar"), QStringLiteral("Add"));
         QCOMPARE(i18n("Editar"), QStringLiteral("Edit"));
         QCOMPARE(i18n("Remover"), QStringLiteral("Remove"));
@@ -50,7 +53,9 @@ private Q_SLOTS:
 
     void portuguese_keeps_source_msgids()
     {
-        KLocalizedString::setLanguages({QStringLiteral("pt_BR")});
+        LocaleService locale;
+        locale.setLanguage(QStringLiteral("pt_BR"));
+        LocaleService::finishI18nSetup();
         QCOMPARE(i18n("Adicionar"), QStringLiteral("Adicionar"));
         QCOMPARE(i18n("Aplicativos Web"), QStringLiteral("Aplicativos Web"));
         QCOMPARE(i18n("Estação de Aplicativos Web"),

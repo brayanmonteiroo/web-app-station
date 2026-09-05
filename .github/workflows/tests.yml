@@ -13,7 +13,7 @@ jobs:
     runs-on: ubuntu-24.04
     # Ubuntu 24.04 não tem KF6 nos repos; Fedora alinha com o ambiente de desenvolvimento.
     container:
-      image: fedora:42
+      image: fedora:44
 
     steps:
       - name: Install dependencies

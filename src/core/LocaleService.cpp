@@ -141,13 +141,18 @@ void LocaleService::registerLocaleDirs()
 void LocaleService::applyLanguageOverride(const QString &code)
 {
     const QString normalized = normalizeCode(code);
+    // Em KF6 mais antigos (ex.: Fedora 42 do CI), setLanguages sozinho
+    // não basta — gettext ainda lê LANGUAGE/LANG.
+    applyLanguageEnv(normalized);
     if (normalized == QStringLiteral("en")) {
-        KLocalizedString::setLanguages({QStringLiteral("en")});
+        KLocalizedString::setLanguages(
+            {QStringLiteral("en"), QStringLiteral("en_US")});
         return;
     }
     if (normalized == QStringLiteral("pt_BR")) {
         // Sem .mo de pt: KI18n devolve o msgid (português fonte).
-        KLocalizedString::setLanguages({QStringLiteral("pt_BR")});
+        KLocalizedString::setLanguages(
+            {QStringLiteral("pt_BR"), QStringLiteral("pt")});
         return;
     }
     KLocalizedString::clearLanguages();
