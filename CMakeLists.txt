@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: MIT
 cmake_minimum_required(VERSION 3.22)
 
-project(webappstation VERSION 1.0.13 LANGUAGES CXX)
+project(webappstation VERSION 1.0.14 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -50,6 +50,8 @@ ki18n_install(po)
 install(PROGRAMS org.kde.webappstation.desktop DESTINATION ${KDE_INSTALL_APPDIR})
 install(FILES resources/icons/org.kde.webappstation.svg
         DESTINATION ${KDE_INSTALL_ICONDIR}/hicolor/scalable/apps)
+install(FILES resources/icons/org.kde.webappstation.png
+        DESTINATION ${KDE_INSTALL_ICONDIR}/hicolor/256x256/apps)
 install(DIRECTORY resources/firefox
         DESTINATION ${KDE_INSTALL_DATADIR}/webappstation)
 

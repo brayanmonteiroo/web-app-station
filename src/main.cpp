@@ -18,32 +18,49 @@
 
 namespace {
 
-QString bundledAppIconPath()
+QStringList iconCandidatePaths()
 {
+    QStringList roots;
     if (qEnvironmentVariableIsSet("APPDIR")) {
-        const QString fromAppDir =
-            QDir(qEnvironmentVariable("APPDIR"))
-                .filePath(QStringLiteral(
-                    "usr/share/icons/hicolor/scalable/apps/"
-                    "org.kde.webappstation.svg"));
-        if (QFile::exists(fromAppDir)) {
-            return fromAppDir;
+        roots << QDir(qEnvironmentVariable("APPDIR")).filePath(
+            QStringLiteral("usr/share/icons"));
+    }
+    roots << QDir::cleanPath(
+        QDir(QCoreApplication::applicationDirPath())
+            .filePath(QStringLiteral("../share/icons")));
+
+    QStringList out;
+    const QStringList relative = {
+        QStringLiteral("hicolor/256x256/apps/org.kde.webappstation.png"),
+        QStringLiteral("hicolor/48x48/apps/org.kde.webappstation.png"),
+        QStringLiteral("hicolor/scalable/apps/org.kde.webappstation.svg"),
+    };
+    for (const QString &root : roots) {
+        for (const QString &rel : relative) {
+            out << QDir(root).filePath(rel);
         }
     }
-
-    const QString besideBin =
-        QDir(QCoreApplication::applicationDirPath())
-            .filePath(QStringLiteral(
-                "../share/icons/hicolor/scalable/apps/"
-                "org.kde.webappstation.svg"));
-    if (QFile::exists(besideBin)) {
-        return QDir::cleanPath(besideBin);
-    }
-
-    return QStandardPaths::locate(
+    out << QStandardPaths::locate(
+        QStandardPaths::GenericDataLocation,
+        QStringLiteral(
+            "icons/hicolor/256x256/apps/org.kde.webappstation.png"));
+    out << QStandardPaths::locate(
         QStandardPaths::GenericDataLocation,
         QStringLiteral(
             "icons/hicolor/scalable/apps/org.kde.webappstation.svg"));
+    out.removeAll(QString());
+    return out;
+}
+
+QString bundledAppIconPath()
+{
+    // Preferir PNG: evita dlopen de libQt6Svg no boot (SEGV se ELF corrompido).
+    for (const QString &path : iconCandidatePaths()) {
+        if (QFile::exists(path)) {
+            return path;
+        }
+    }
+    return {};
 }
 
 } // namespace

@@ -18,6 +18,8 @@ TOOLS_DIR="$ROOT/.appimage-tools"
 
 DESKTOP="$ROOT/org.kde.webappstation.desktop"
 ICON="$ROOT/resources/icons/org.kde.webappstation.svg"
+ICON_PNG="$ROOT/resources/icons/org.kde.webappstation.png"
+
 
 download_tool() {
   local url="$1"
@@ -52,9 +54,14 @@ echo "==> Instalando em AppDir..."
 rm -rf "$APPDIR"
 DESTDIR="$APPDIR" cmake --install build
 
-mkdir -p "$APPDIR/usr/share/applications" "$APPDIR/usr/share/icons/hicolor/scalable/apps"
+mkdir -p "$APPDIR/usr/share/applications" \
+  "$APPDIR/usr/share/icons/hicolor/scalable/apps" \
+  "$APPDIR/usr/share/icons/hicolor/256x256/apps"
 cp -f "$DESKTOP" "$APPDIR/usr/share/applications/"
 cp -f "$ICON" "$APPDIR/usr/share/icons/hicolor/scalable/apps/${APP_ID}.svg"
+if [[ -f "$ICON_PNG" ]]; then
+  cp -f "$ICON_PNG" "$APPDIR/usr/share/icons/hicolor/256x256/apps/${APP_ID}.png"
+fi
 ln -sfn "usr/share/applications/${APP_ID}.desktop" "$APPDIR/${APP_ID}.desktop"
 ln -sfn "usr/share/icons/hicolor/scalable/apps/${APP_ID}.svg" "$APPDIR/${APP_ID}.svg"
 ln -sfn "usr/share/icons/hicolor/scalable/apps/${APP_ID}.svg" "$APPDIR/.DirIcon"
@@ -245,8 +252,12 @@ for icondir in /usr/share/icons/breeze /usr/share/icons/breeze-dark \
   fi
 done
 # Garante o ícone do app mesmo se hicolor do sistema sobrescrever parcialmente.
-mkdir -p "$APPDIR/usr/share/icons/hicolor/scalable/apps"
+mkdir -p "$APPDIR/usr/share/icons/hicolor/scalable/apps" \
+  "$APPDIR/usr/share/icons/hicolor/256x256/apps"
 cp -f "$ICON" "$APPDIR/usr/share/icons/hicolor/scalable/apps/${APP_ID}.svg"
+if [[ -f "$ICON_PNG" ]]; then
+  cp -f "$ICON_PNG" "$APPDIR/usr/share/icons/hicolor/256x256/apps/${APP_ID}.png"
+fi
 
 # Fallback: se linuxdeploy não empacotou Qt, copia à força.
 if ! find "$APPDIR" -name 'libQt6Core.so*' | grep -q .; then
@@ -267,32 +278,12 @@ for plugdir in /usr/lib64/qt6/plugins /usr/lib/qt6/plugins; do
   fi
 done
 
-# AppImage self-contained: RUNPATH aponta para usr/lib do AppDir (não do host).
-# LD_LIBRARY_PATH no AppRun reforça o mesmo (só ${HERE}/usr/lib).
-set_runpath_to_applib() {
-  local f="$1"
-  local dir rel
-  dir="$(dirname "$f")"
-  rel="$(realpath -s --relative-to="$dir" "$APPDIR/usr/lib" 2>/dev/null || true)"
-  if [[ -z "$rel" ]]; then
-    return 0
-  fi
-  patchelf --set-rpath "\$ORIGIN/$rel" "$f" 2>/dev/null || true
-}
-
+# AppImage self-contained: LD_LIBRARY_PATH no AppRun = só ${HERE}/usr/lib.
+# NÃO rodar patchelf --set-rpath em massa em libQt6*/libKF6*: o patchelf
+# desloca secções ELF e deixa DT_INIT órfão (SIGSEGV em dl_init no
+# libQt6Svg.so.6 e afins). RUNPATH só no binário e no updater.
 if command -v patchelf >/dev/null 2>&1; then
-  echo "==> Definindo RUNPATH das libs/plugins para usr/lib do AppDir..."
-  find "$APPDIR/usr/lib" "$APPDIR/usr/plugins" "$APPDIR/usr/qml" \
-    -type f \( -name '*.so' -o -name '*.so.*' \) -print0 2>/dev/null \
-    | while IFS= read -r -d '' f; do
-        # libqxcb: sem RPATH agressivo — usa libxcb do host (já removemos
-        # libxcb-* do AppDir). Qt continua via LD_LIBRARY_PATH do AppRun.
-        if [[ "$(basename "$f")" == libqxcb.so ]]; then
-          patchelf --remove-rpath "$f" 2>/dev/null || true
-          continue
-        fi
-        set_runpath_to_applib "$f"
-      done
+  echo "==> Ajustando RUNPATH só do binário/updater (sem patchelf em massa no Qt)..."
   if [[ -x "$APPDIR/usr/bin/${BINARY}" ]]; then
     patchelf --set-rpath '$ORIGIN/../lib' "$APPDIR/usr/bin/${BINARY}" || true
   fi
@@ -304,8 +295,42 @@ if command -v patchelf >/dev/null 2>&1; then
         -exec patchelf --set-rpath '$ORIGIN' {} \; 2>/dev/null || true
     fi
   fi
+  # libqxcb: sem RPATH agressivo — usa libxcb do host.
+  if [[ -f "$APPDIR/usr/plugins/platforms/libqxcb.so" ]]; then
+    patchelf --remove-rpath "$APPDIR/usr/plugins/platforms/libqxcb.so" 2>/dev/null || true
+  fi
 else
-  echo "Aviso: patchelf ausente — RPATHs podem ficar inconsistentes." >&2
+  echo "Aviso: patchelf ausente — RPATHs do binário podem ficar inconsistentes." >&2
+fi
+
+# Garante QtSvg intacto (cópia do sistema, sem patchelf).
+echo "==> Restaurando libQt6Svg do sistema (evita ELF corrompido)..."
+if [[ -e /usr/lib64/libQt6Svg.so.6 ]]; then
+  SVG_REAL="$(readlink -f /usr/lib64/libQt6Svg.so.6)"
+  SVG_BASE="$(basename "$SVG_REAL")"
+  cp -aL "$SVG_REAL" "$APPDIR/usr/lib/$SVG_BASE"
+  ln -sfn "$SVG_BASE" "$APPDIR/usr/lib/libQt6Svg.so.6"
+  # Symlink de desenvolvimento, se existir.
+  if [[ -L /usr/lib64/libQt6Svg.so ]]; then
+    ln -sfn "$SVG_BASE" "$APPDIR/usr/lib/libQt6Svg.so"
+  fi
+fi
+
+# Smoke: libQt6Svg tem de carregar (falha = ELF corrompido / SEGV no start).
+if command -v python3 >/dev/null 2>&1; then
+  echo "==> Smoke dlopen libQt6Svg..."
+  if ! LD_LIBRARY_PATH="$APPDIR/usr/lib" python3 - <<PY
+import ctypes, os, sys
+root = os.environ["LD_LIBRARY_PATH"]
+ctypes.CDLL(os.path.join(root, "libQt6Core.so.6"), mode=ctypes.RTLD_GLOBAL)
+ctypes.CDLL(os.path.join(root, "libQt6Gui.so.6"), mode=ctypes.RTLD_GLOBAL)
+ctypes.CDLL(os.path.join(root, "libQt6Svg.so.6"), mode=ctypes.RTLD_GLOBAL)
+print("libQt6Svg OK")
+PY
+  then
+    echo "Erro: libQt6Svg não carrega (SEGV/ELF) — AppImage quebraria no start." >&2
+    exit 1
+  fi
 fi
 
 if [[ ! -x "$APPDIR/usr/bin/appimageupdatetool" ]]; then
