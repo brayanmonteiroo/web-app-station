@@ -142,46 +142,46 @@ jobs:
           # Gate duro: DT_INIT órfão / SEGV em Kirigami (bug das releases 1.0.14–15).
           test -e squashfs-root/usr/lib/libKirigamiControls.so.6
           python3 - <<'PY'
-import ctypes, os, re, subprocess, sys
+          import ctypes, os, re, subprocess, sys
 
-root = os.environ["LD_LIBRARY_PATH"]
-critical = [
-    "libQt6Core.so.6",
-    "libQt6QuickControls2Fusion.so.6",
-    "libKirigamiControls.so.6",
-    "libKF6I18n.so.6",
-]
+          root = os.environ["LD_LIBRARY_PATH"]
+          critical = [
+              "libQt6Core.so.6",
+              "libQt6QuickControls2Fusion.so.6",
+              "libKirigamiControls.so.6",
+              "libKF6I18n.so.6",
+          ]
 
-def resolve(path: str) -> str:
-    while os.path.islink(path):
-        target = os.readlink(path)
-        if not os.path.isabs(target):
-            target = os.path.join(os.path.dirname(path), target)
-        path = target
-    return path
+          def resolve(path: str) -> str:
+              while os.path.islink(path):
+                  target = os.readlink(path)
+                  if not os.path.isabs(target):
+                      target = os.path.join(os.path.dirname(path), target)
+                  path = target
+              return path
 
-for name in critical:
-    link = os.path.join(root, name)
-    if not os.path.exists(link):
-        print(f"MISSING {name}", file=sys.stderr)
-        sys.exit(1)
-    path = resolve(link)
-    dyn = subprocess.check_output(["readelf", "-d", path], text=True, errors="replace")
-    sec = subprocess.check_output(["readelf", "-S", path], text=True, errors="replace")
-    m_init = re.search(r"\(INIT\)\s+0x([0-9a-fA-F]+)", dyn)
-    m_sec = re.search(r"\.init\s+PROGBITS\s+([0-9a-fA-F]+)", sec)
-    if not m_init or not m_sec:
-        print(f"NO_INIT_TAGS {name}", file=sys.stderr)
-        sys.exit(1)
-    dt = int(m_init.group(1), 16)
-    addr = int(m_sec.group(1), 16)
-    if dt != addr:
-        print(f"DT_INIT_MISMATCH {name} DT_INIT=0x{dt:x} .init=0x{addr:x}", file=sys.stderr)
-        sys.exit(1)
-    print(f"load {name}")
-    ctypes.CDLL(path, mode=ctypes.RTLD_GLOBAL)
-print("dlopen + DT_INIT OK (Qt/Fusion/Kirigami/KF)")
-PY
+          for name in critical:
+              link = os.path.join(root, name)
+              if not os.path.exists(link):
+                  print(f"MISSING {name}", file=sys.stderr)
+                  sys.exit(1)
+              path = resolve(link)
+              dyn = subprocess.check_output(["readelf", "-d", path], text=True, errors="replace")
+              sec = subprocess.check_output(["readelf", "-S", path], text=True, errors="replace")
+              m_init = re.search(r"\(INIT\)\s+0x([0-9a-fA-F]+)", dyn)
+              m_sec = re.search(r"\.init\s+PROGBITS\s+([0-9a-fA-F]+)", sec)
+              if not m_init or not m_sec:
+                  print(f"NO_INIT_TAGS {name}", file=sys.stderr)
+                  sys.exit(1)
+              dt = int(m_init.group(1), 16)
+              addr = int(m_sec.group(1), 16)
+              if dt != addr:
+                  print(f"DT_INIT_MISMATCH {name} DT_INIT=0x{dt:x} .init=0x{addr:x}", file=sys.stderr)
+                  sys.exit(1)
+              print(f"load {name}")
+              ctypes.CDLL(path, mode=ctypes.RTLD_GLOBAL)
+          print("dlopen + DT_INIT OK (Qt/Fusion/Kirigami/KF)")
+          PY
 
           # Execução: em container headless pode segfault (GPU/session).
           # Falha só se faltar .so (127 / loading shared libraries).
