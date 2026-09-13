@@ -215,14 +215,13 @@ copy_missing_glob "/usr/lib64/libKF6*.so*" "$APPDIR/usr/lib"
 copy_missing_glob "/usr/lib64/libKirigami*.so*" "$APPDIR/usr/lib"
 copy_missing_glob "/usr/lib64/libkirigami*.so*" "$APPDIR/usr/lib"
 
-# QML org.kde.* (Kirigami, desktop style, etc.)
+# QML org.kde.* (Kirigami) — sem qqc2-desktop-style (estilo Plasma).
 mkdir -p "$APPDIR/usr/qml/org" "$APPDIR/usr/lib/qml/org"
 for qmlroot in /usr/lib64/qt6/qml /usr/lib64/qml /usr/lib/qt6/qml; do
   if [[ -d "$qmlroot/org/kde" ]]; then
     cp -a "$qmlroot/org/kde" "$APPDIR/usr/qml/org/"
     cp -a "$qmlroot/org/kde" "$APPDIR/usr/lib/qml/org/"
   fi
-  # QtQuick modules que Kirigami precisa
   for mod in QtQuick QtQml Qt; do
     if [[ -d "$qmlroot/$mod" ]]; then
       mkdir -p "$APPDIR/usr/qml"
@@ -230,6 +229,24 @@ for qmlroot in /usr/lib64/qt6/qml /usr/lib64/qml /usr/lib/qt6/qml; do
     fi
   done
 done
+rm -rf "$APPDIR/usr/qml/org/kde/qqc2desktopstyle" \
+       "$APPDIR/usr/lib/qml/org/kde/qqc2desktopstyle" || true
+
+# Ícones mínimos no AppDir (não depender do tema do DE do host).
+for icondir in /usr/share/icons/breeze /usr/share/icons/breeze-dark \
+               /usr/share/icons/hicolor; do
+  if [[ -d "$icondir" ]]; then
+    base="$(basename "$icondir")"
+    mkdir -p "$APPDIR/usr/share/icons"
+    if [[ ! -d "$APPDIR/usr/share/icons/$base" ]]; then
+      echo "==> Copiando ícones $base..."
+      cp -a "$icondir" "$APPDIR/usr/share/icons/" || true
+    fi
+  fi
+done
+# Garante o ícone do app mesmo se hicolor do sistema sobrescrever parcialmente.
+mkdir -p "$APPDIR/usr/share/icons/hicolor/scalable/apps"
+cp -f "$ICON" "$APPDIR/usr/share/icons/hicolor/scalable/apps/${APP_ID}.svg"
 
 # Fallback: se linuxdeploy não empacotou Qt, copia à força.
 if ! find "$APPDIR" -name 'libQt6Core.so*' | grep -q .; then
@@ -250,22 +267,35 @@ for plugdir in /usr/lib64/qt6/plugins /usr/lib/qt6/plugins; do
   fi
 done
 
-# DT_RPATH ($ORIGIN) nas libs/plugins faz o loader preferir tudo do AppDir e
-# no Fedora recente o plugin libqxcb.so aborta em dl_init. O binário deve
-# usar DT_RUNPATH (não herdado) e deixar deps transitivas do KF virem do
-# host — desde que o Qt empacotado seja o mesmo da distro de build (fedora:44).
+# AppImage self-contained: RUNPATH aponta para usr/lib do AppDir (não do host).
+# LD_LIBRARY_PATH no AppRun reforça o mesmo (só ${HERE}/usr/lib).
+set_runpath_to_applib() {
+  local f="$1"
+  local dir rel
+  dir="$(dirname "$f")"
+  rel="$(realpath -s --relative-to="$dir" "$APPDIR/usr/lib" 2>/dev/null || true)"
+  if [[ -z "$rel" ]]; then
+    return 0
+  fi
+  patchelf --set-rpath "\$ORIGIN/$rel" "$f" 2>/dev/null || true
+}
+
 if command -v patchelf >/dev/null 2>&1; then
-  echo "==> Normalizando RPATH (RUNPATH só no binário)..."
+  echo "==> Definindo RUNPATH das libs/plugins para usr/lib do AppDir..."
   find "$APPDIR/usr/lib" "$APPDIR/usr/plugins" "$APPDIR/usr/qml" \
     -type f \( -name '*.so' -o -name '*.so.*' \) -print0 2>/dev/null \
     | while IFS= read -r -d '' f; do
-        patchelf --remove-rpath "$f" 2>/dev/null || true
+        # libqxcb: sem RPATH agressivo — usa libxcb do host (já removemos
+        # libxcb-* do AppDir). Qt continua via LD_LIBRARY_PATH do AppRun.
+        if [[ "$(basename "$f")" == libqxcb.so ]]; then
+          patchelf --remove-rpath "$f" 2>/dev/null || true
+          continue
+        fi
+        set_runpath_to_applib "$f"
       done
   if [[ -x "$APPDIR/usr/bin/${BINARY}" ]]; then
-    # sem --force-rpath => DT_RUNPATH
     patchelf --set-rpath '$ORIGIN/../lib' "$APPDIR/usr/bin/${BINARY}" || true
   fi
-  # Updater: libs próprias em usr/lib/appimageupdate (OpenSSL 1.1 etc.).
   if [[ -x "$APPDIR/usr/bin/appimageupdatetool" ]]; then
     patchelf --set-rpath '$ORIGIN/../lib/appimageupdate:$ORIGIN/../lib' \
       "$APPDIR/usr/bin/appimageupdatetool" || true
@@ -275,7 +305,7 @@ if command -v patchelf >/dev/null 2>&1; then
     fi
   fi
 else
-  echo "Aviso: patchelf ausente — RPATHs do linuxdeploy podem ficar agressivos." >&2
+  echo "Aviso: patchelf ausente — RPATHs podem ficar inconsistentes." >&2
 fi
 
 if [[ ! -x "$APPDIR/usr/bin/appimageupdatetool" ]]; then
@@ -321,17 +351,16 @@ cat > "$APPDIR/AppRun" << 'EOF'
 HERE="$(dirname "$(readlink -f "$0")")"
 export APPDIR="${APPDIR:-$HERE}"
 export PATH="${HERE}/usr/bin:${PATH}"
-# NÃO exportar LD_LIBRARY_PATH: o binário já tem RPATH ($ORIGIN/../lib) e
-# qt.conf. Forçar usr/lib no LD_LIBRARY_PATH mistura libs e causa SIGSEGV
-# ao carregar plugins QML (ex.: Controls/Basic).
+# Somente libs do AppImage — nunca misturar com LD_LIBRARY_PATH do host.
+export LD_LIBRARY_PATH="${HERE}/usr/lib"
 export QT_PLUGIN_PATH="${HERE}/usr/plugins"
 export QML2_IMPORT_PATH="${HERE}/usr/qml:${HERE}/usr/lib/qml"
 export QML_IMPORT_PATH="$QML2_IMPORT_PATH"
-export XDG_DATA_DIRS="${HERE}/usr/share:/usr/share:/usr/local/share${XDG_DATA_DIRS:+:$XDG_DATA_DIRS}"
+export XDG_DATA_DIRS="${HERE}/usr/share${XDG_DATA_DIRS:+:$XDG_DATA_DIRS}"
 export WEBAPPSTATION_LOCALE_DIR="${HERE}/usr/share/locale"
+# Estilo único portátil (sem org.kde.desktop / Plasma).
+export QT_QUICK_CONTROLS_STYLE="${QT_QUICK_CONTROLS_STYLE:-Fusion}"
 unset QT_ROOT_PATH
-# Evitar que o host injete outro Qt via LD_LIBRARY_PATH do usuário.
-unset LD_LIBRARY_PATH
 exec "${HERE}/usr/bin/webappstation" "$@"
 EOF
 chmod +x "$APPDIR/AppRun"

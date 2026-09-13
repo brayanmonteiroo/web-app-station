@@ -163,8 +163,7 @@ bool DesktopEntry::write(const WebApp &app, const QString &execLine)
         << "MimeType=text/html;text/xml;application/xhtml_xml;\n"
         << "StartupWMClass="
         << ExecBuilder::startupWmClass(app.browserName(), app.codename(),
-                                       app.url(),
-                                       /*chromiumFamily=*/false)
+                                       app.url())
         << '\n'
         << "StartupNotify=true\n"
         << "X-WebApp-Browser=" << app.browserName() << '\n'

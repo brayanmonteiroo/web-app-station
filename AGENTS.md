@@ -5,9 +5,10 @@ Instruções para agentes de IA neste repositório. Siga à risca.
 ## Stack
 
 - C++20 / Qt 6 / KF6 (Kirigami, KI18n, KCoreAddons, KConfig, KIconThemes)
+- UI **DE-agnóstica**: estilo **Fusion** sempre (sem `org.kde.desktop` / Plasma)
 - CMake + Ninja; testes com Qt Test / CTest (`autotests/`)
-- Empacote: AppImage (`packaging/appimage/build.sh`)
-- CI: GitHub Actions em **Fedora 44** (`.github/workflows/tests.yml`, `appimage.yml`)
+- Empacote: AppImage **self-contained** (`packaging/appimage/build.sh`) — libs KF/Qt/Kirigami **dentro** do AppDir; runtime não usa KF/Plasma do host
+- CI: GitHub Actions em **Fedora 44** (`.github/workflows/tests.yml`, `appimage.yml`); smoke do AppImage em job **sem** `kf6-*`/`kirigami`/`plasma` no host
 
 ## Idioma
 
@@ -36,10 +37,11 @@ git push origin HEAD
 ## Release AppImage
 
 1. Rodar testes locais: `ctest --test-dir <build> --output-on-failure` (e/ou Docker Fedora 44)
-2. Bump `project(webappstation VERSION x.y.z)` em `CMakeLists.txt`
-3. Commit limpo (sem co-autor Cursor)
-4. `git push origin HEAD` e `git tag -a vX.Y.Z -m "vX.Y.Z" && git push origin vX.Y.Z`
-5. Workflow `AppImage` sobe assets na Release; confirmar URL + `.AppImage` / `.zsync`
+2. Confirmar smoke self-contained (workflow `AppImage` job `smoke-nofk`, ou extract local com `LD_LIBRARY_PATH` só do AppDir + `QT_QPA_PLATFORM=offscreen`)
+3. Bump `project(webappstation VERSION x.y.z)` em `CMakeLists.txt`
+4. Commit limpo (sem co-autor Cursor)
+5. `git push origin HEAD` e `git tag -a vX.Y.Z -m "vX.Y.Z" && git push origin vX.Y.Z`
+6. Workflow `AppImage` sobe assets na Release; confirmar URL + `.AppImage` / `.zsync`
 
 ## i18n (KI18n)
 
@@ -57,7 +59,8 @@ git push origin HEAD
 - `declare(strict` não se aplica a C++; preferir tipos explícitos, RAII, serviços finos (`src/core/`)
 - UI QML em `src/qml/`; lógica em C++ (`AppController`, services)
 - Preferência de idioma: `LocaleService` mapeia `en` → catálogo `en_GB`, ajusta `LANGUAGE`/`LANG` e chama `setlocale(LC_ALL, "")` (necessário quando o processo nasce com `LANG=C.UTF-8`)
-- Updates AppImage: `UpdateService` + `appimageupdatetool` empacotado; não misturar `LD_LIBRARY_PATH` do host no AppRun
+- Updates AppImage: `UpdateService` + `appimageupdatetool` empacotado; `LD_LIBRARY_PATH` no AppRun = **somente** `${APPDIR}/usr/lib` (nunca misturar host)
+- Estilo QML: `QQuickStyle::setStyle("Fusion")` — sem detectar DE; não empacotar `qqc2-desktop-style`
 
 ## Build local
 

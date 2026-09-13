@@ -20,9 +20,10 @@ Os Web Apps ficam em `~/.local/share/applications/` como arquivos `.desktop`. Í
 
 ## Requisitos
 
-- Linux (testado com Fedora / KDE Plasma)
+- Linux (qualquer DE/WM: KDE, GNOME, Hyprland, etc. — AppImage é DE-agnóstico)
 - CMake 3.22+, Ninja, compilador C++20
-- Qt 6 e KDE Frameworks 6 (Kirigami, I18n, CoreAddons, Config, IconThemes)
+- Qt 6 e KDE Frameworks 6 **só para build** (Kirigami, I18n, CoreAddons, Config, IconThemes)
+- Runtime do AppImage: **não** exige KF/Plasma/Kirigami instalados no host
 
 ## Build (Fedora)
 
@@ -83,7 +84,9 @@ Artefatos:
 - `WebAppStation-<versão>-x86_64.AppImage`
 - `WebAppStation-<versão>-x86_64.AppImage.zsync`
 
-Em tags `v*`, o GitHub Actions (container Fedora) publica esses arquivos na release. Dentro do AppImage, o botão de atualização verifica e aplica a nova versão e pede para reiniciar.
+O pacote é **self-contained**: Qt, Kirigami e KF necessários vão dentro do AppDir; o AppRun usa `LD_LIBRARY_PATH` só do AppImage. A UI usa estilo **Fusion** (sem acoplar a Plasma/`org.kde.desktop`). Roda em KDE, GNOME, Hyprland e outros.
+
+Em tags `v*`, o GitHub Actions (container Fedora) publica esses arquivos na release e roda um smoke num host **sem** pacotes `kf6-*`/`kirigami`/`plasma`. Dentro do AppImage, o botão de atualização verifica e aplica a nova versão e pede para reiniciar.
 
 ## Licença
 

@@ -131,6 +131,14 @@ QString ExecBuilder::startupWmClass(const Browser &browser,
 
 QString ExecBuilder::startupWmClass(const QString &browserName,
                                     const QString &codename,
+                                    const QString &url)
+{
+    return startupWmClass(browserName, codename, url,
+                          browserNameLooksChromium(browserName));
+}
+
+QString ExecBuilder::startupWmClass(const QString &browserName,
+                                    const QString &codename,
                                     const QString &url,
                                     bool chromiumFamily)
 {
@@ -239,22 +247,30 @@ QString ExecBuilder::build(const Browser &browser,
         return exec;
     }
 
-    // Chromium: WMClass no formato PWA/Hub (chrome-host__-Default) para o
-    // Plasma Wayland associar o ícone. user-data-dir só com perfil isolado.
+    // Chromium: WMClass no formato PWA/Hub (chrome-host__-Default).
+    // Ordem alinhada ao Web App Manager (Mint): --app/--class/--name,
+    // depois user-data-dir / privado, depois parâmetros extras
+    // (--start-maximized no fim). Preferences maximizado independente
+    // de perfil isolado (isolado = user-data nosso; senão = config do browser).
     const QString wmClass = chromiumWmClass(browser.name, url);
+    const bool startMaximized =
+        hasFlag(custom, QStringLiteral("--start-maximized"));
 
     exec = browser.execPath + QStringLiteral(" --no-first-run");
-    if (!custom.isEmpty()) {
-        exec += QLatin1Char(' ') + custom;
-    }
     exec += QStringLiteral(" --app=\"%1\" --class=%2 --name=%2")
                 .arg(url, wmClass);
 
+    QString isolatedProfilePath;
     if (isolateProfile) {
-        const QString profilePath =
+        isolatedProfilePath =
             QDir(Paths::chromiumProfilesDir()).filePath(codename);
-        QDir().mkpath(profilePath);
-        exec += QStringLiteral(" --user-data-dir=%1").arg(profilePath);
+        ProfileService::ensureChromiumProfile(isolatedProfilePath,
+                                              startMaximized);
+        exec += QStringLiteral(" --user-data-dir=%1").arg(isolatedProfilePath);
+    } else if (startMaximized) {
+        ProfileService::ensureChromiumMaximized(
+            ProfileService::chromiumSharedUserDataDir(browser.name,
+                                                      browser.execPath));
     }
 
     if (privateWindow) {
@@ -263,6 +279,9 @@ QString ExecBuilder::build(const Browser &browser,
         } else {
             exec += QStringLiteral(" --incognito");
         }
+    }
+    if (!custom.isEmpty()) {
+        exec += QLatin1Char(' ') + custom;
     }
     return exec;
 }

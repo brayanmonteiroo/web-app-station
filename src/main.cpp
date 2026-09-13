@@ -7,10 +7,46 @@
 #include <KLocalizedString>
 
 #include <QApplication>
+#include <QCoreApplication>
+#include <QDir>
+#include <QFile>
 #include <QIcon>
 #include <QQmlApplicationEngine>
 #include <QQmlContext>
 #include <QQuickStyle>
+#include <QStandardPaths>
+
+namespace {
+
+QString bundledAppIconPath()
+{
+    if (qEnvironmentVariableIsSet("APPDIR")) {
+        const QString fromAppDir =
+            QDir(qEnvironmentVariable("APPDIR"))
+                .filePath(QStringLiteral(
+                    "usr/share/icons/hicolor/scalable/apps/"
+                    "org.kde.webappstation.svg"));
+        if (QFile::exists(fromAppDir)) {
+            return fromAppDir;
+        }
+    }
+
+    const QString besideBin =
+        QDir(QCoreApplication::applicationDirPath())
+            .filePath(QStringLiteral(
+                "../share/icons/hicolor/scalable/apps/"
+                "org.kde.webappstation.svg"));
+    if (QFile::exists(besideBin)) {
+        return QDir::cleanPath(besideBin);
+    }
+
+    return QStandardPaths::locate(
+        QStandardPaths::GenericDataLocation,
+        QStringLiteral(
+            "icons/hicolor/scalable/apps/org.kde.webappstation.svg"));
+}
+
+} // namespace
 
 int main(int argc, char *argv[])
 {
@@ -33,11 +69,18 @@ int main(int argc, char *argv[])
     about.setHomepage(
         QStringLiteral("https://github.com/brayanmonteiroo/web-app-station"));
     KAboutData::setApplicationData(about);
-    QApplication::setWindowIcon(QIcon::fromTheme(
-        QStringLiteral("org.kde.webappstation"),
-        QIcon::fromTheme(QStringLiteral("applications-internet"))));
 
-    QQuickStyle::setStyle(QStringLiteral("org.kde.desktop"));
+    // Estilo único DE-agnóstico (sem org.kde.desktop / Plasma).
+    QQuickStyle::setStyle(QStringLiteral("Fusion"));
+
+    const QString iconPath = bundledAppIconPath();
+    if (!iconPath.isEmpty()) {
+        QApplication::setWindowIcon(QIcon(iconPath));
+    } else {
+        QApplication::setWindowIcon(QIcon::fromTheme(
+            QStringLiteral("org.kde.webappstation"),
+            QIcon::fromTheme(QStringLiteral("applications-internet"))));
+    }
 
     QQmlApplicationEngine engine;
     auto *controller = new AppController(&app);

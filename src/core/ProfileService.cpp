@@ -7,6 +7,9 @@
 #include <QFile>
 #include <QFileInfo>
 #include <QImage>
+#include <QJsonDocument>
+#include <QJsonObject>
+#include <QStandardPaths>
 #include <QTextStream>
 
 namespace {
@@ -54,6 +57,63 @@ void writeFirefoxXulStore(const QString &profilePath, bool startMaximized)
         "    }\n"
         "  }\n"
         "}\n");
+}
+
+/**
+ * Chromium/Wayland costuma ignorar --start-maximized. Grava
+ * {userDataDir}/Default/Preferences com maximized=true (merge).
+ * Vale para perfil isolado e para o perfil compartilhado do browser.
+ */
+void writeChromiumMaximizedPreferences(const QString &userDataDir)
+{
+    if (userDataDir.isEmpty()) {
+        return;
+    }
+    const QString defaultDir =
+        QDir(userDataDir).filePath(QStringLiteral("Default"));
+    QDir().mkpath(defaultDir);
+    const QString path =
+        QDir(defaultDir).filePath(QStringLiteral("Preferences"));
+
+    QByteArray raw;
+    if (QFile::exists(path)) {
+        QFile in(path);
+        if (in.open(QIODevice::ReadOnly)) {
+            raw = in.readAll();
+        }
+    }
+    if (raw.trimmed().isEmpty()) {
+        raw = QByteArrayLiteral("{}");
+    }
+
+    QJsonParseError err{};
+    QJsonDocument doc = QJsonDocument::fromJson(raw, &err);
+    if (err.error != QJsonParseError::NoError || !doc.isObject()) {
+        doc = QJsonDocument(QJsonObject{});
+    }
+
+    QJsonObject root = doc.object();
+    QJsonObject browser = root.value(QStringLiteral("browser")).toObject();
+
+    auto setMaximized = [](QJsonObject placement) {
+        placement.insert(QStringLiteral("maximized"), true);
+        return placement;
+    };
+
+    browser.insert(
+        QStringLiteral("window_placement"),
+        setMaximized(browser.value(QStringLiteral("window_placement")).toObject()));
+    browser.insert(
+        QStringLiteral("window_placement_popup"),
+        setMaximized(
+            browser.value(QStringLiteral("window_placement_popup")).toObject()));
+    root.insert(QStringLiteral("browser"), browser);
+
+    QFile out(path);
+    if (!out.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
+        return;
+    }
+    out.write(QJsonDocument(root).toJson(QJsonDocument::Indented));
 }
 
 } // namespace
@@ -148,6 +208,77 @@ void ProfileService::removeThemeIcon(const QString &themeName)
         return;
     }
     QFile::remove(Paths::hicolorIconPath(themeName));
+}
+
+void ProfileService::ensureChromiumProfile(const QString &profilePath,
+                                           bool startMaximized)
+{
+    if (profilePath.isEmpty()) {
+        return;
+    }
+    QDir().mkpath(profilePath);
+    if (startMaximized) {
+        writeChromiumMaximizedPreferences(profilePath);
+    }
+}
+
+QString ProfileService::chromiumSharedUserDataDir(const QString &browserName,
+                                                  const QString &execPath)
+{
+    const QString name = browserName.toLower();
+    const QString exec = execPath.toLower();
+    const QString home = QDir::homePath();
+    const QString config =
+        QStandardPaths::writableLocation(QStandardPaths::ConfigLocation);
+
+    // Flatpak (path do export ou .var/app).
+    if (exec.contains(QStringLiteral("com.google.chrome"))) {
+        return home
+            + QStringLiteral(
+                "/.var/app/com.google.Chrome/config/google-chrome");
+    }
+    if (exec.contains(QStringLiteral("org.chromium.chromium"))) {
+        return home
+            + QStringLiteral(
+                "/.var/app/org.chromium.Chromium/config/chromium");
+    }
+    if (exec.contains(QStringLiteral("com.brave.browser"))) {
+        return home
+            + QStringLiteral(
+                "/.var/app/com.brave.Browser/config/BraveSoftware/"
+                "Brave-Browser");
+    }
+    if (exec.contains(QStringLiteral("com.microsoft.edge"))) {
+        return home
+            + QStringLiteral(
+                "/.var/app/com.microsoft.Edge/config/microsoft-edge");
+    }
+    if (exec.contains(QStringLiteral("com.vivaldi.vivaldi"))) {
+        return home
+            + QStringLiteral("/.var/app/com.vivaldi.Vivaldi/config/vivaldi");
+    }
+
+    if (name.contains(QStringLiteral("brave"))) {
+        return config
+            + QStringLiteral("/BraveSoftware/Brave-Browser");
+    }
+    if (name.contains(QStringLiteral("edge"))) {
+        return config + QStringLiteral("/microsoft-edge");
+    }
+    if (name.contains(QStringLiteral("vivaldi"))) {
+        return config + QStringLiteral("/vivaldi");
+    }
+    if (name.contains(QStringLiteral("chromium"))
+        || exec.contains(QStringLiteral("chromium"))) {
+        return config + QStringLiteral("/chromium");
+    }
+    // Chrome / google-chrome-* e fallback.
+    return config + QStringLiteral("/google-chrome");
+}
+
+void ProfileService::ensureChromiumMaximized(const QString &userDataDir)
+{
+    writeChromiumMaximizedPreferences(userDataDir);
 }
 
 void ProfileService::ensureFirefoxProfile(const QString &profilePath,

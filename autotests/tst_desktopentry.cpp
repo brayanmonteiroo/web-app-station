@@ -63,6 +63,8 @@ private Q_SLOTS:
         QCOMPARE(parsed.customParameters(), QStringLiteral("--start-maximized"));
         QCOMPARE(parsed.exec(), exec);
         QVERIFY(parsed.isolateProfile());
+        QVERIFY(content.contains(
+            QStringLiteral("StartupWMClass=chrome-app.notion.com__-Default")));
     }
 
     void updateFields_does_not_corrupt_exec()

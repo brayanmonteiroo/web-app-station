@@ -30,6 +30,11 @@ public:
                                                 const QString &codename,
                                                 const QString &url);
 
+    /** Detecta família Chromium pelo nome do browser. */
+    [[nodiscard]] static QString startupWmClass(const QString &browserName,
+                                                const QString &codename,
+                                                const QString &url);
+
     [[nodiscard]] static QString startupWmClass(const QString &browserName,
                                                 const QString &codename,
                                                 const QString &url,
