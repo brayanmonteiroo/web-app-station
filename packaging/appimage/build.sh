@@ -200,8 +200,9 @@ copy_glob() {
   done
 }
 
-# KF6 / Kirigami (além do que o plugin Qt puxar).
-# Só copia o que ainda falta — não sobrescrever libs já patchelfadas pelo linuxdeploy.
+# KF6 / Kirigami: preencher o que o linuxdeploy não puxou (ficheiros
+# versionados em falta). O restore unificado mais abaixo substitui
+# qualquer cópia corrompida pelo patchelf — não preservar ELF podre.
 copy_missing_glob() {
   local pattern="$1"
   local dest="$2"
@@ -304,10 +305,10 @@ else
 fi
 
 # linuxdeploy/patchelf desloca secções ELF e deixa DT_INIT órfão
-# (SIGSEGV em dl_init: QtSvg, QuickControls2Fusion, …).
-# Substitui no AppDir as libQt6* já empacotadas por cópias limpas do host.
-echo "==> Restaurando libQt6* empacotadas a partir do host (ELF intacto)..."
-qt6_host_lib() {
+# (SIGSEGV em dl_init: QtSvg, QuickControls2Fusion, KirigamiControls, …).
+# Substitui no AppDir libQt6*/libKF6*/libKirigami* por cópias limpas do host.
+echo "==> Restaurando libQt6*/libKF6*/libKirigami* a partir do host (ELF intacto)..."
+host_lib_dir() {
   if [[ -d /usr/lib64 ]]; then
     echo /usr/lib64
   else
@@ -315,10 +316,10 @@ qt6_host_lib() {
   fi
 }
 
-restore_one_qt6_soname() {
+restore_one_soname() {
   local soname="$1"
   local host
-  host="$(qt6_host_lib)"
+  host="$(host_lib_dir)"
   local host_link="$host/$soname"
   [[ -e "$host_link" ]] || return 1
   local real
@@ -332,27 +333,35 @@ restore_one_qt6_soname() {
   ln -sfn "$real_base" "$APPDIR/usr/lib/$soname"
 }
 
-# 1) Todas as libQt6*.so.* já no AppDir (ficheiros reais versionados).
-host="$(qt6_host_lib)"
-for bundled in "$APPDIR/usr/lib"/libQt6*.so.*; do
-  [[ -e "$bundled" ]] || continue
-  base="$(basename "$bundled")"
-  if [[ -L "$bundled" ]]; then
-    # soname symlink — recria a partir do host
-    if [[ -e "$host/$base" ]]; then
-      restore_one_qt6_soname "$base" || true
+restore_bundled_family() {
+  local prefix="$1"
+  local host bundled base
+  host="$(host_lib_dir)"
+  shopt -s nullglob
+  for bundled in "$APPDIR/usr/lib"/${prefix}*.so.*; do
+    [[ -e "$bundled" ]] || continue
+    base="$(basename "$bundled")"
+    if [[ -L "$bundled" ]]; then
+      if [[ -e "$host/$base" ]]; then
+        restore_one_soname "$base" || true
+      fi
+      continue
     fi
-    continue
-  fi
-  # Ficheiro versionado ou .so.6 sem symlink
-  if [[ -f "$host/$base" && ! -L "$host/$base" ]]; then
-    cp -aL "$host/$base" "$bundled"
-  elif [[ "$base" =~ \.so\.[0-9]+$ ]] && [[ -e "$host/$base" ]]; then
-    restore_one_qt6_soname "$base" || true
-  fi
-done
+    if [[ -f "$host/$base" && ! -L "$host/$base" ]]; then
+      cp -aL "$host/$base" "$bundled"
+    elif [[ "$base" =~ \.so\.[0-9]+$ ]] && [[ -e "$host/$base" ]]; then
+      restore_one_soname "$base" || true
+    fi
+  done
+  shopt -u nullglob
+}
 
-# 2) Lista crítica do arranque (Fusion/Svg) — sempre restaurar.
+restore_bundled_family "libQt6"
+restore_bundled_family "libKF6"
+restore_bundled_family "libKirigami"
+restore_bundled_family "libkirigami"
+
+# Lista crítica do arranque — sempre restaurar (Qt + KF + Kirigami).
 for need in \
   libQt6Core.so.6 \
   libQt6Gui.so.6 \
@@ -367,9 +376,13 @@ for need in \
   libQt6Svg.so.6 \
   libQt6Widgets.so.6 \
   libQt6WaylandClient.so.6 \
-  libQt6XcbQpa.so.6
+  libQt6XcbQpa.so.6 \
+  libKF6I18n.so.6 \
+  libKF6CoreAddons.so.6 \
+  libKF6ConfigCore.so.6 \
+  libKirigamiControls.so.6
 do
-  restore_one_qt6_soname "$need" || true
+  restore_one_soname "$need" || true
 done
 
 if [[ ! -e "$APPDIR/usr/lib/libQt6Core.so.6" ]]; then
@@ -380,10 +393,77 @@ if [[ ! -e "$APPDIR/usr/lib/libQt6QuickControls2Fusion.so.6" ]]; then
   echo "Erro: libQt6QuickControls2Fusion.so.6 ausente após restore (estilo Fusion)." >&2
   exit 1
 fi
+if [[ ! -e "$APPDIR/usr/lib/libKirigamiControls.so.6" ]]; then
+  echo "Erro: libKirigamiControls.so.6 ausente após restore (QML Kirigami)." >&2
+  exit 1
+fi
 
-# Smoke: libs críticas do arranque (Fusion + Svg) têm de dlopen sem SEGV.
+# Gate: DT_INIT tem de coincidir com a secção .init (patchelf órfão).
+if command -v python3 >/dev/null 2>&1 && command -v readelf >/dev/null 2>&1; then
+  echo "==> Gate DT_INIT == .init (libs críticas)..."
+  if ! APPDIR_LIB="$APPDIR/usr/lib" python3 - <<'PY'
+import os, re, subprocess, sys
+
+root = os.environ["APPDIR_LIB"]
+critical = [
+    "libQt6Core.so.6",
+    "libQt6Gui.so.6",
+    "libQt6Qml.so.6",
+    "libQt6Quick.so.6",
+    "libQt6QuickControls2.so.6",
+    "libQt6QuickControls2Fusion.so.6",
+    "libQt6Svg.so.6",
+    "libKF6I18n.so.6",
+    "libKF6CoreAddons.so.6",
+    "libKF6ConfigCore.so.6",
+    "libKirigamiControls.so.6",
+]
+
+def resolve(path: str) -> str:
+    while os.path.islink(path):
+        target = os.readlink(path)
+        if not os.path.isabs(target):
+            target = os.path.join(os.path.dirname(path), target)
+        path = target
+    return path
+
+failed = False
+for name in critical:
+    link = os.path.join(root, name)
+    if not os.path.exists(link):
+        print(f"MISSING {name}", file=sys.stderr)
+        failed = True
+        continue
+    path = resolve(link)
+    dyn = subprocess.check_output(["readelf", "-d", path], text=True, errors="replace")
+    sec = subprocess.check_output(["readelf", "-S", path], text=True, errors="replace")
+    m_init = re.search(r"\(INIT\)\s+0x([0-9a-fA-F]+)", dyn)
+    m_sec = re.search(r"\.init\s+PROGBITS\s+([0-9a-fA-F]+)", sec)
+    if not m_init or not m_sec:
+        print(f"NO_INIT_TAGS {name}", file=sys.stderr)
+        failed = True
+        continue
+    dt = int(m_init.group(1), 16)
+    addr = int(m_sec.group(1), 16)
+    if dt != addr:
+        print(
+            f"DT_INIT_MISMATCH {name} DT_INIT=0x{dt:x} .init=0x{addr:x}",
+            file=sys.stderr,
+        )
+        failed = True
+    else:
+        print(f"OK {name} DT_INIT=0x{dt:x}")
+sys.exit(1 if failed else 0)
+PY
+  then
+    echo "Erro: DT_INIT órfão após restore — AppImage quebraria no start." >&2
+    exit 1
+  fi
+fi
+
+# Smoke: libs críticas (Qt + KF + Kirigami) têm de dlopen sem SEGV.
 if command -v python3 >/dev/null 2>&1; then
-  echo "==> Smoke dlopen Qt6 (Core/Gui/Qml/Quick/Controls2/Fusion/Svg)..."
+  echo "==> Smoke dlopen Qt6/KF6/Kirigami..."
   if ! LD_LIBRARY_PATH="$APPDIR/usr/lib" python3 - <<'PY'
 import ctypes, os, sys
 
@@ -399,30 +479,38 @@ libs = [
     "libQt6QuickControls2Fusion.so.6",
     "libQt6QuickTemplates2.so.6",
     "libQt6Svg.so.6",
+    "libKF6I18n.so.6",
+    "libKF6CoreAddons.so.6",
+    "libKF6ConfigCore.so.6",
+    "libKirigamiControls.so.6",
 ]
+required = {
+    "libQt6Core.so.6",
+    "libQt6Gui.so.6",
+    "libQt6Qml.so.6",
+    "libQt6Quick.so.6",
+    "libQt6QuickControls2.so.6",
+    "libQt6QuickControls2Fusion.so.6",
+    "libQt6Svg.so.6",
+    "libKF6I18n.so.6",
+    "libKF6CoreAddons.so.6",
+    "libKF6ConfigCore.so.6",
+    "libKirigamiControls.so.6",
+}
 for name in libs:
     path = os.path.join(root, name)
     if not os.path.exists(path):
-        # OpenGL/Templates podem variar; Fusion/Svg/Core são obrigatórios.
-        if name in (
-            "libQt6Core.so.6",
-            "libQt6Gui.so.6",
-            "libQt6Qml.so.6",
-            "libQt6Quick.so.6",
-            "libQt6QuickControls2.so.6",
-            "libQt6QuickControls2Fusion.so.6",
-            "libQt6Svg.so.6",
-        ):
+        if name in required:
             print(f"MISSING {name}", file=sys.stderr)
             sys.exit(1)
         print(f"skip optional {name}")
         continue
     print(f"load {name}")
     ctypes.CDLL(path, mode=ctypes.RTLD_GLOBAL)
-print("Qt6 dlopen OK")
+print("Qt6/KF6/Kirigami dlopen OK")
 PY
   then
-    echo "Erro: dlopen Qt6 falhou (SEGV/ELF) — AppImage quebraria no start." >&2
+    echo "Erro: dlopen Qt/KF/Kirigami falhou (SEGV/ELF) — AppImage quebraria no start." >&2
     exit 1
   fi
 fi
