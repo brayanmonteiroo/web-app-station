@@ -303,32 +303,126 @@ else
   echo "Aviso: patchelf ausente — RPATHs do binário podem ficar inconsistentes." >&2
 fi
 
-# Garante QtSvg intacto (cópia do sistema, sem patchelf).
-echo "==> Restaurando libQt6Svg do sistema (evita ELF corrompido)..."
-if [[ -e /usr/lib64/libQt6Svg.so.6 ]]; then
-  SVG_REAL="$(readlink -f /usr/lib64/libQt6Svg.so.6)"
-  SVG_BASE="$(basename "$SVG_REAL")"
-  cp -aL "$SVG_REAL" "$APPDIR/usr/lib/$SVG_BASE"
-  ln -sfn "$SVG_BASE" "$APPDIR/usr/lib/libQt6Svg.so.6"
-  # Symlink de desenvolvimento, se existir.
-  if [[ -L /usr/lib64/libQt6Svg.so ]]; then
-    ln -sfn "$SVG_BASE" "$APPDIR/usr/lib/libQt6Svg.so"
+# linuxdeploy/patchelf desloca secções ELF e deixa DT_INIT órfão
+# (SIGSEGV em dl_init: QtSvg, QuickControls2Fusion, …).
+# Substitui no AppDir as libQt6* já empacotadas por cópias limpas do host.
+echo "==> Restaurando libQt6* empacotadas a partir do host (ELF intacto)..."
+qt6_host_lib() {
+  if [[ -d /usr/lib64 ]]; then
+    echo /usr/lib64
+  else
+    echo /usr/lib
   fi
+}
+
+restore_one_qt6_soname() {
+  local soname="$1"
+  local host
+  host="$(qt6_host_lib)"
+  local host_link="$host/$soname"
+  [[ -e "$host_link" ]] || return 1
+  local real
+  real="$(readlink -f "$host_link")"
+  [[ -f "$real" ]] || return 1
+  local real_base
+  real_base="$(basename "$real")"
+  # Remove ficheiro corrompido que usava o nome do soname.
+  rm -f "$APPDIR/usr/lib/$soname"
+  cp -aL "$real" "$APPDIR/usr/lib/$real_base"
+  ln -sfn "$real_base" "$APPDIR/usr/lib/$soname"
+}
+
+# 1) Todas as libQt6*.so.* já no AppDir (ficheiros reais versionados).
+host="$(qt6_host_lib)"
+for bundled in "$APPDIR/usr/lib"/libQt6*.so.*; do
+  [[ -e "$bundled" ]] || continue
+  base="$(basename "$bundled")"
+  if [[ -L "$bundled" ]]; then
+    # soname symlink — recria a partir do host
+    if [[ -e "$host/$base" ]]; then
+      restore_one_qt6_soname "$base" || true
+    fi
+    continue
+  fi
+  # Ficheiro versionado ou .so.6 sem symlink
+  if [[ -f "$host/$base" && ! -L "$host/$base" ]]; then
+    cp -aL "$host/$base" "$bundled"
+  elif [[ "$base" =~ \.so\.[0-9]+$ ]] && [[ -e "$host/$base" ]]; then
+    restore_one_qt6_soname "$base" || true
+  fi
+done
+
+# 2) Lista crítica do arranque (Fusion/Svg) — sempre restaurar.
+for need in \
+  libQt6Core.so.6 \
+  libQt6Gui.so.6 \
+  libQt6DBus.so.6 \
+  libQt6Network.so.6 \
+  libQt6OpenGL.so.6 \
+  libQt6Qml.so.6 \
+  libQt6Quick.so.6 \
+  libQt6QuickControls2.so.6 \
+  libQt6QuickControls2Fusion.so.6 \
+  libQt6QuickTemplates2.so.6 \
+  libQt6Svg.so.6 \
+  libQt6Widgets.so.6 \
+  libQt6WaylandClient.so.6 \
+  libQt6XcbQpa.so.6
+do
+  restore_one_qt6_soname "$need" || true
+done
+
+if [[ ! -e "$APPDIR/usr/lib/libQt6Core.so.6" ]]; then
+  echo "Erro: falha ao restaurar libQt6Core.so.6 do host." >&2
+  exit 1
+fi
+if [[ ! -e "$APPDIR/usr/lib/libQt6QuickControls2Fusion.so.6" ]]; then
+  echo "Erro: libQt6QuickControls2Fusion.so.6 ausente após restore (estilo Fusion)." >&2
+  exit 1
 fi
 
-# Smoke: libQt6Svg tem de carregar (falha = ELF corrompido / SEGV no start).
+# Smoke: libs críticas do arranque (Fusion + Svg) têm de dlopen sem SEGV.
 if command -v python3 >/dev/null 2>&1; then
-  echo "==> Smoke dlopen libQt6Svg..."
-  if ! LD_LIBRARY_PATH="$APPDIR/usr/lib" python3 - <<PY
+  echo "==> Smoke dlopen Qt6 (Core/Gui/Qml/Quick/Controls2/Fusion/Svg)..."
+  if ! LD_LIBRARY_PATH="$APPDIR/usr/lib" python3 - <<'PY'
 import ctypes, os, sys
+
 root = os.environ["LD_LIBRARY_PATH"]
-ctypes.CDLL(os.path.join(root, "libQt6Core.so.6"), mode=ctypes.RTLD_GLOBAL)
-ctypes.CDLL(os.path.join(root, "libQt6Gui.so.6"), mode=ctypes.RTLD_GLOBAL)
-ctypes.CDLL(os.path.join(root, "libQt6Svg.so.6"), mode=ctypes.RTLD_GLOBAL)
-print("libQt6Svg OK")
+libs = [
+    "libQt6Core.so.6",
+    "libQt6Gui.so.6",
+    "libQt6Network.so.6",
+    "libQt6Qml.so.6",
+    "libQt6OpenGL.so.6",
+    "libQt6Quick.so.6",
+    "libQt6QuickControls2.so.6",
+    "libQt6QuickControls2Fusion.so.6",
+    "libQt6QuickTemplates2.so.6",
+    "libQt6Svg.so.6",
+]
+for name in libs:
+    path = os.path.join(root, name)
+    if not os.path.exists(path):
+        # OpenGL/Templates podem variar; Fusion/Svg/Core são obrigatórios.
+        if name in (
+            "libQt6Core.so.6",
+            "libQt6Gui.so.6",
+            "libQt6Qml.so.6",
+            "libQt6Quick.so.6",
+            "libQt6QuickControls2.so.6",
+            "libQt6QuickControls2Fusion.so.6",
+            "libQt6Svg.so.6",
+        ):
+            print(f"MISSING {name}", file=sys.stderr)
+            sys.exit(1)
+        print(f"skip optional {name}")
+        continue
+    print(f"load {name}")
+    ctypes.CDLL(path, mode=ctypes.RTLD_GLOBAL)
+print("Qt6 dlopen OK")
 PY
   then
-    echo "Erro: libQt6Svg não carrega (SEGV/ELF) — AppImage quebraria no start." >&2
+    echo "Erro: dlopen Qt6 falhou (SEGV/ELF) — AppImage quebraria no start." >&2
     exit 1
   fi
 fi
