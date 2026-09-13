@@ -305,9 +305,9 @@ else
 fi
 
 # linuxdeploy/patchelf desloca secções ELF e deixa DT_INIT órfão
-# (SIGSEGV em dl_init: QtSvg, QuickControls2Fusion, KirigamiControls, …).
-# Substitui no AppDir libQt6*/libKF6*/libKirigami* por cópias limpas do host.
-echo "==> Restaurando libQt6*/libKF6*/libKirigami* a partir do host (ELF intacto)..."
+# (SEGV em dl_init: QtSvg, KirigamiControls, libjpeg, …). Whack-a-mole
+# por família falha — restaurar TODAS as .so de usr/lib que existam no host.
+echo "==> Restaurando todas as .so de usr/lib disponíveis no host (ELF intacto)..."
 host_lib_dir() {
   if [[ -d /usr/lib64 ]]; then
     echo /usr/lib64
@@ -333,35 +333,43 @@ restore_one_soname() {
   ln -sfn "$real_base" "$APPDIR/usr/lib/$soname"
 }
 
-restore_bundled_family() {
-  local prefix="$1"
-  local host bundled base
-  host="$(host_lib_dir)"
-  shopt -s nullglob
-  for bundled in "$APPDIR/usr/lib"/${prefix}*.so.*; do
-    [[ -e "$bundled" ]] || continue
-    base="$(basename "$bundled")"
-    if [[ -L "$bundled" ]]; then
-      if [[ -e "$host/$base" ]]; then
-        restore_one_soname "$base" || true
-      fi
-      continue
-    fi
-    if [[ -f "$host/$base" && ! -L "$host/$base" ]]; then
-      cp -aL "$host/$base" "$bundled"
-    elif [[ "$base" =~ \.so\.[0-9]+$ ]] && [[ -e "$host/$base" ]]; then
-      restore_one_soname "$base" || true
-    fi
-  done
-  shopt -u nullglob
-}
+# Sonames únicos em usr/lib (ficheiros reais + symlinks .so.*).
+declare -A _restore_sonames=()
+shopt -s nullglob
+for bundled in "$APPDIR/usr/lib"/*.so*; do
+  [[ -e "$bundled" ]] || continue
+  [[ -f "$bundled" || -L "$bundled" ]] || continue
+  base="$(basename "$bundled")"
+  real_path="$bundled"
+  if [[ -L "$bundled" ]]; then
+    real_path="$(readlink -f "$bundled" 2>/dev/null || true)"
+  fi
+  soname=""
+  if [[ -n "$real_path" && -f "$real_path" ]] && command -v readelf >/dev/null 2>&1; then
+    soname="$(readelf -d "$real_path" 2>/dev/null \
+      | awk '/\(SONAME\)/{gsub(/[\[\]]/,"",$NF); print $NF; exit}')"
+  fi
+  if [[ -z "$soname" && "$base" =~ \.so(\.[0-9]+)+$ ]]; then
+    soname="$base"
+  fi
+  [[ -n "$soname" ]] || continue
+  _restore_sonames["$soname"]=1
+done
+shopt -u nullglob
 
-restore_bundled_family "libQt6"
-restore_bundled_family "libKF6"
-restore_bundled_family "libKirigami"
-restore_bundled_family "libkirigami"
+restored=0
+skipped=0
+for soname in "${!_restore_sonames[@]}"; do
+  if restore_one_soname "$soname"; then
+    restored=$((restored + 1))
+  else
+    skipped=$((skipped + 1))
+    echo "  (sem host) $soname"
+  fi
+done
+echo "==> Restore host: $restored sonames; $skipped sem equivalente no host"
 
-# Lista crítica do arranque — sempre restaurar (Qt + KF + Kirigami).
+# Garantir críticas do arranque mesmo se o scan falhar.
 for need in \
   libQt6Core.so.6 \
   libQt6Gui.so.6 \
@@ -380,7 +388,9 @@ for need in \
   libKF6I18n.so.6 \
   libKF6CoreAddons.so.6 \
   libKF6ConfigCore.so.6 \
-  libKirigamiControls.so.6
+  libKirigamiControls.so.6 \
+  libjpeg.so.62 \
+  libxkbcommon-x11.so.0
 do
   restore_one_soname "$need" || true
 done
@@ -398,72 +408,87 @@ if [[ ! -e "$APPDIR/usr/lib/libKirigamiControls.so.6" ]]; then
   exit 1
 fi
 
-# Gate: DT_INIT tem de coincidir com a secção .init (patchelf órfão).
+# Gate: QUALQUER .so em usr/lib com DT_INIT ≠ .init falha o build.
 if command -v python3 >/dev/null 2>&1 && command -v readelf >/dev/null 2>&1; then
-  echo "==> Gate DT_INIT == .init (libs críticas)..."
+  echo "==> Gate DT_INIT == .init (todas as .so em usr/lib)..."
   if ! APPDIR_LIB="$APPDIR/usr/lib" python3 - <<'PY'
 import os, re, subprocess, sys
 
 root = os.environ["APPDIR_LIB"]
-critical = [
-    "libQt6Core.so.6",
-    "libQt6Gui.so.6",
-    "libQt6Qml.so.6",
-    "libQt6Quick.so.6",
-    "libQt6QuickControls2.so.6",
-    "libQt6QuickControls2Fusion.so.6",
-    "libQt6Svg.so.6",
-    "libKF6I18n.so.6",
-    "libKF6CoreAddons.so.6",
-    "libKF6ConfigCore.so.6",
-    "libKirigamiControls.so.6",
-]
 
 def resolve(path: str) -> str:
+    seen = set()
     while os.path.islink(path):
+        if path in seen:
+            break
+        seen.add(path)
         target = os.readlink(path)
         if not os.path.isabs(target):
             target = os.path.join(os.path.dirname(path), target)
         path = target
     return path
 
+checked = set()
 failed = False
-for name in critical:
+for name in sorted(os.listdir(root)):
+    if ".so" not in name:
+        continue
     link = os.path.join(root, name)
-    if not os.path.exists(link):
-        print(f"MISSING {name}", file=sys.stderr)
-        failed = True
+    if not os.path.isfile(link) and not os.path.islink(link):
         continue
     path = resolve(link)
-    dyn = subprocess.check_output(["readelf", "-d", path], text=True, errors="replace")
-    sec = subprocess.check_output(["readelf", "-S", path], text=True, errors="replace")
+    if not os.path.isfile(path):
+        continue
+    # Evitar re-checar o mesmo inode via vários symlinks.
+    try:
+        key = os.stat(path).st_ino
+    except OSError:
+        key = path
+    if key in checked:
+        continue
+    checked.add(key)
+    try:
+        dyn = subprocess.check_output(["readelf", "-d", path], text=True, errors="replace")
+        sec = subprocess.check_output(["readelf", "-S", path], text=True, errors="replace")
+    except subprocess.CalledProcessError:
+        continue
     m_init = re.search(r"\(INIT\)\s+0x([0-9a-fA-F]+)", dyn)
     m_sec = re.search(r"\.init\s+PROGBITS\s+([0-9a-fA-F]+)", sec)
     if not m_init or not m_sec:
-        print(f"NO_INIT_TAGS {name}", file=sys.stderr)
-        failed = True
         continue
     dt = int(m_init.group(1), 16)
     addr = int(m_sec.group(1), 16)
     if dt != addr:
         print(
-            f"DT_INIT_MISMATCH {name} DT_INIT=0x{dt:x} .init=0x{addr:x}",
+            f"DT_INIT_MISMATCH {name} -> {os.path.basename(path)} "
+            f"DT_INIT=0x{dt:x} .init=0x{addr:x}",
             file=sys.stderr,
         )
         failed = True
-    else:
-        print(f"OK {name} DT_INIT=0x{dt:x}")
+
+# Críticas do arranque têm de existir.
+for req in (
+    "libQt6Core.so.6",
+    "libQt6QuickControls2Fusion.so.6",
+    "libKirigamiControls.so.6",
+    "libjpeg.so.62",
+):
+    if not os.path.exists(os.path.join(root, req)):
+        print(f"MISSING {req}", file=sys.stderr)
+        failed = True
+
 sys.exit(1 if failed else 0)
 PY
   then
     echo "Erro: DT_INIT órfão após restore — AppImage quebraria no start." >&2
     exit 1
   fi
+  echo "==> Gate DT_INIT OK (usr/lib)"
 fi
 
-# Smoke: libs críticas (Qt + KF + Kirigami) têm de dlopen sem SEGV.
+# Smoke: libs críticas + jpeg (carregado tarde via Gui/ícones).
 if command -v python3 >/dev/null 2>&1; then
-  echo "==> Smoke dlopen Qt6/KF6/Kirigami..."
+  echo "==> Smoke dlopen Qt6/KF6/Kirigami/jpeg..."
   if ! LD_LIBRARY_PATH="$APPDIR/usr/lib" python3 - <<'PY'
 import ctypes, os, sys
 
@@ -483,6 +508,8 @@ libs = [
     "libKF6CoreAddons.so.6",
     "libKF6ConfigCore.so.6",
     "libKirigamiControls.so.6",
+    "libjpeg.so.62",
+    "libxkbcommon-x11.so.0",
 ]
 required = {
     "libQt6Core.so.6",
@@ -496,6 +523,7 @@ required = {
     "libKF6CoreAddons.so.6",
     "libKF6ConfigCore.so.6",
     "libKirigamiControls.so.6",
+    "libjpeg.so.62",
 }
 for name in libs:
     path = os.path.join(root, name)
@@ -507,10 +535,10 @@ for name in libs:
         continue
     print(f"load {name}")
     ctypes.CDLL(path, mode=ctypes.RTLD_GLOBAL)
-print("Qt6/KF6/Kirigami dlopen OK")
+print("dlopen OK (Qt/KF/Kirigami/jpeg)")
 PY
   then
-    echo "Erro: dlopen Qt/KF/Kirigami falhou (SEGV/ELF) — AppImage quebraria no start." >&2
+    echo "Erro: dlopen falhou (SEGV/ELF) — AppImage quebraria no start." >&2
     exit 1
   fi
 fi
