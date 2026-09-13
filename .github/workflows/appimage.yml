@@ -71,13 +71,19 @@ jobs:
     steps:
       - name: Install runtime mínimo (sem KF/Plasma)
         run: |
+          set -euo pipefail
+          # Nomes Fedora 44+: libwayland-client (não wayland-libs-client).
+          # libglvnd-* para OpenGL/EGL sem puxar KF/Plasma.
           dnf install -y --setopt=install_weak_deps=False \
-            glibc libstdc++ libgcc zlib \
+            glibc libstdc++ libgcc zlib-ng-compat zlib \
             libxcb libX11 libXext libXrender libXi libxkbcommon \
             mesa-libGL fontconfig freetype harfbuzz \
-            wayland-libs-client dbus-libs pcre2 \
+            libwayland-client libwayland-cursor libwayland-egl \
+            libglvnd libglvnd-opengl libglvnd-egl \
+            dbus-libs pcre2 glib2 libicu openssl-libs \
             which file curl fuse fuse-libs \
-            glibc-langpack-en
+            glibc-langpack-en \
+            --skip-unavailable
           # Falha se o host tiver KF/Kirigami/Plasma (prova de isolamento).
           if rpm -qa | grep -E '^(kf6-|kirigami|plasma-)'; then
             echo "Host do smoke não deve ter KF/Kirigami/Plasma" >&2
@@ -97,11 +103,14 @@ jobs:
           APPIMAGE=$(ls -1 artifacts/WebAppStation-*-x86_64.AppImage | head -n1)
           test -f "$APPIMAGE"
           chmod +x "$APPIMAGE"
+          # Em container o bind do artifact pode vir sem +x executável no mount.
+          cp "$APPIMAGE" /tmp/webappstation.AppImage
+          chmod +x /tmp/webappstation.AppImage
 
           mkdir -p /tmp/appimg-smoke
           cd /tmp/appimg-smoke
           export APPIMAGE_EXTRACT_AND_RUN=1
-          "$OLDPWD/$APPIMAGE" --appimage-extract
+          /tmp/webappstation.AppImage --appimage-extract
 
           test -x squashfs-root/usr/bin/webappstation
           test -n "$(find squashfs-root/usr/lib -name 'libKF6I18n.so*' | head -n1)"
@@ -112,7 +121,8 @@ jobs:
           # Resolver só libs do AppDir (simula Arch limpo / Hyprland sem KF).
           export LD_LIBRARY_PATH="$PWD/squashfs-root/usr/lib"
           export QT_PLUGIN_PATH="$PWD/squashfs-root/usr/plugins"
-          export QML_IMPORT_PATH="$PWD/squashfs-root/usr/qml"
+          export QML_IMPORT_PATH="$PWD/squashfs-root/usr/qml:${PWD}/squashfs-root/usr/lib/qml"
+          export QML2_IMPORT_PATH="$QML_IMPORT_PATH"
           export QT_QPA_PLATFORM=offscreen
           export QT_QUICK_CONTROLS_STYLE=Fusion
           unset QT_STYLE_OVERRIDE || true
@@ -122,16 +132,26 @@ jobs:
             echo "Dependências faltando no AppImage (não self-contained)" >&2
             exit 1
           fi
+          # KF/Qt devem resolver de dentro do AppDir, não de /usr/lib64 do host.
+          if grep -E 'libKF6|libQt6|libKirigami' /tmp/ldd-smoke.txt \
+               | grep -v squashfs-root | grep -E ' => /usr/'; then
+            echo "KF/Qt resolvendo do host — AppImage não está self-contained" >&2
+            exit 1
+          fi
 
-          # Sobe o AppRun; timeout evita hang em GUI. Exit 0/124 (timeout) OK;
-          # crash por .so/QML ausente falha o job.
+          # Execução: em container headless pode segfault (GPU/session).
+          # Falha só se faltar .so (127 / loading shared libraries).
           set +e
-          timeout 20 squashfs-root/AppRun --help >/tmp/apprun-out.txt 2>&1
+          timeout 20 squashfs-root/AppRun >/tmp/apprun-out.txt 2>&1
           rc=$?
           set -e
           cat /tmp/apprun-out.txt || true
-          # 0 = ok; 124 = timeout (app pode ignorar --help e abrir UI); outros = falha.
-          if [[ "$rc" -ne 0 && "$rc" -ne 124 ]]; then
-            echo "AppRun falhou com código $rc (provável lib/QML ausente)" >&2
+          if grep -qi 'error while loading shared libraries' /tmp/apprun-out.txt; then
+            echo "AppRun: biblioteca compartilhada ausente" >&2
             exit 1
           fi
+          if [[ "$rc" -eq 127 ]]; then
+            echo "AppRun exit 127 (comando/lib não encontrado)" >&2
+            exit 1
+          fi
+          echo "Smoke OK (ldd + KF no AppDir; AppRun rc=$rc)"
